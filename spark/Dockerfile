@@ -5,3 +5,6 @@ COPY ./jars/*.jar /opt/bitnami/spark/jars/
 
 # Config file
 COPY ./spark/config/spark-defaults.conf /opt/bitnami/spark/conf/spark-defaults.conf
+
+# Install Delta Lake
+RUN pip install delta-spark==3.2.0
