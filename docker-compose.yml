@@ -6,8 +6,8 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-    networks:
-      - system_net
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
 
   kafka:
     image: confluentinc/cp-kafka:7.7.0
@@ -25,41 +25,37 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"  
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-    networks:
-      - system_net
     healthcheck:
       test: ["CMD-SHELL", "cub kafka-ready -b localhost:9092 1 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+    volumes:
+      - kafka_data:/var/lib/kafka/data
 
   minio:
     image: minio/minio:latest
     container_name: minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
     ports:
       - "9000:9000"
       - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
-    restart: unless-stopped
 
-  minio_init:
-    image: minio/mc:latest
-    container_name: minio_init
+  minio-init:
+    image: minio/mc
     depends_on:
       - minio
     entrypoint: >
       /bin/sh -c "
-      sleep 10 &&
-      mc alias set local http://minio:9000 minioadmin minioadmin &&
-      mc mb local/mybucket &&
-      mc policy set public local/mybucket
-      "
-    restart: "no"
+        sleep 10;
+        mc alias set myminio http://minio:9000 minioadmin minioadmin;
+        mc mb myminio/bronze myminio/silver myminio/gold;
+        mc policy set public myminio/raw myminio/cleaned" 
 
   spark-master:
     image: bitnamilegacy/spark:3.5.1
@@ -91,3 +87,146 @@ services:
       - SPARK_WORKER_MEMORY=2g
     depends_on:
       - spark-master
+
+  airflow-redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  airflow-postgres:
+    image: postgres:15
+    container_name: airflow-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    volumes:
+      - airflow_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+
+  airflow-init:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: airflow-init
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-redis:
+        condition: service_healthy
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__CORE__FERNET_KEY=z_lL_eTlP5BTuFAYKS8t4sqVfh97hySVN3PW4NCcwy4=
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    entrypoint: /bin/bash
+    command: -c "airflow db init && airflow users create --username admin --password admin --firstname admin --lastname user --role Admin --email admin@example.com"
+
+  airflow-webserver:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: airflow-webserver
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      airflow-postgres:
+        condition: service_healthy
+      airflow-redis:
+        condition: service_healthy
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__CORE__FERNET_KEY=z_lL_eTlP5BTuFAYKS8t4sqVfh97hySVN3PW4NCcwy4=
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    ports:
+      - "8686:8080"
+    command: webserver
+    healthcheck:
+      test: ["CMD-SHELL", "[ -f /opt/airflow/airflow-webserver.pid ]"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+
+  airflow-scheduler:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: airflow-scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      airflow-postgres:
+        condition: service_healthy
+      airflow-redis:
+        condition: service_healthy
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__CORE__FERNET_KEY=z_lL_eTlP5BTuFAYKS8t4sqVfh97hySVN3PW4NCcwy4=
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    command: scheduler
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --local"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+
+  airflow-worker:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: airflow-worker
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      airflow-postgres:
+        condition: service_healthy
+      airflow-redis:
+        condition: service_healthy
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__CORE__FERNET_KEY=z_lL_eTlP5BTuFAYKS8t4sqVfh97hySVN3PW4NCcwy4=
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    command: celery worker
+    healthcheck:
+      test: ["CMD-SHELL", "celery --app airflow.executors.celery_executor.app inspect ping -d celery@$HOSTNAME"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+
+volumes:
+  zookeeper_data:
+  kafka_data:
+  minio_data:
+  airflow_postgres_data:
+  airflow_redis_data:
+  
