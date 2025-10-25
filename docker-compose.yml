@@ -8,6 +8,8 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     volumes:
       - zookeeper_data:/var/lib/zookeeper/data
+    networks:
+      - nlhtung-net
 
   kafka-1:
     image: confluentinc/cp-kafka:7.7.0
@@ -35,6 +37,8 @@ services:
       retries: 5
     volumes:
       - kafka_data_1:/var/lib/kafka/data
+    networks:
+      - nlhtung-net
 
   kafka-2:
     image: confluentinc/cp-kafka:7.7.0
@@ -62,6 +66,8 @@ services:
       retries: 5
     volumes:
       - kafka_data_2:/var/lib/kafka/data
+    networks:
+      - nlhtung-net
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -74,6 +80,8 @@ services:
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:9092,kafka-2:9092
+    networks:
+      - nlhtung-net
 
   minio:
     image: minio/minio:latest
@@ -87,6 +95,8 @@ services:
       - "9001:9001"
     volumes:
       - minio_data:/data
+    networks:
+      - nlhtung-net
 
   minio-init:
     image: minio/mc
@@ -99,6 +109,8 @@ services:
         mc alias set myminio http://minio:9000 minioadmin minioadmin;
         mc mb myminio/bronze myminio/silver myminio/gold;
         mc policy set public myminio/raw myminio/cleaned" 
+    networks:
+      - nlhtung-net
 
   spark-master:
     build:
@@ -107,11 +119,16 @@ services:
     container_name: spark-master
     environment:
       - SPARK_MODE=master
+      - SPARK_MASTER_HOST=spark-master
+      - SPARK_MASTER_PORT=7077
+      - SPARK_MASTER_WEBUI_PORT=8080
     ports:
       - "8080:8080" 
       - "7077:7077"
     volumes:
       - ./spark/jobs:/opt/spark-apps
+    networks:
+      - nlhtung-net
 
   spark-worker-1:
     build:
@@ -129,6 +146,8 @@ services:
       - spark-master
     volumes:
       - ./spark/jobs:/opt/spark-apps
+    networks:
+      - nlhtung-net
   
   spark-worker-2:
     build:
@@ -146,6 +165,8 @@ services:
       - spark-master
     volumes:
       - ./spark/jobs:/opt/spark-apps
+    networks:
+      - nlhtung-net
 
   airflow-redis:
     image: redis:7
@@ -157,6 +178,8 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    networks:
+      - nlhtung-net
 
   airflow-postgres:
     image: postgres:15
@@ -173,11 +196,13 @@ services:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 5s
       retries: 5
+    networks:
+      - nlhtung-net
 
   airflow-init:
     build:
-      context: ./airflow
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: airflow/Dockerfile
     container_name: airflow-init
     depends_on:
       airflow-postgres:
@@ -193,13 +218,21 @@ services:
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
     volumes:
       - ./airflow/dags:/opt/airflow/dags
+      - ./spark/jobs:/opt/spark-apps
+      - ./spark/config:/opt/spark-config
     entrypoint: /bin/bash
-    command: -c "airflow db init && airflow users create --username admin --password admin --firstname admin --lastname user --role Admin --email admin@example.com"
+    command: >
+      -c "
+      airflow db init && 
+      airflow users create --username admin --password admin --firstname admin --lastname user --role Admin --email admin@example.com &&
+      airflow connections add 'spark_master' --conn-type 'spark' --conn-host 'spark-master' --conn-port '7077'"
+    networks:
+      - nlhtung-net
 
   airflow-webserver:
     build:
-      context: ./airflow
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: airflow/Dockerfile
     container_name: airflow-webserver
     depends_on:
       airflow-init:
@@ -215,8 +248,11 @@ services:
       - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-postgres:5432/airflow
       - AIRFLOW__CORE__FERNET_KEY=z_lL_eTlP5BTuFAYKS8t4sqVfh97hySVN3PW4NCcwy4=
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__WEBSERVER__SECRET_KEY=your-consistent-secret-key
     volumes:
       - ./airflow/dags:/opt/airflow/dags
+      - ./spark/jobs:/opt/spark-apps
+      - ./spark/config:/opt/spark-config
     ports:
       - "8686:8080"
     command: webserver
@@ -225,11 +261,13 @@ services:
       interval: 30s
       timeout: 30s
       retries: 3
+    networks:
+      - nlhtung-net
 
   airflow-scheduler:
     build:
-      context: ./airflow
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: airflow/Dockerfile
     container_name: airflow-scheduler
     depends_on:
       airflow-init:
@@ -245,19 +283,24 @@ services:
       - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-postgres:5432/airflow
       - AIRFLOW__CORE__FERNET_KEY=z_lL_eTlP5BTuFAYKS8t4sqVfh97hySVN3PW4NCcwy4=
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__WEBSERVER__SECRET_KEY=your-consistent-secret-key
     volumes:
       - ./airflow/dags:/opt/airflow/dags
+      - ./spark/jobs:/opt/spark-apps
+      - ./spark/config:/opt/spark-config
     command: scheduler
     healthcheck:
       test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --local"]
       interval: 30s
       timeout: 30s
       retries: 3
+    networks:
+      - nlhtung-net
 
   airflow-worker:
     build:
-      context: ./airflow
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: airflow/Dockerfile
     container_name: airflow-worker
     depends_on:
       airflow-init:
@@ -273,14 +316,19 @@ services:
       - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-postgres:5432/airflow
       - AIRFLOW__CORE__FERNET_KEY=z_lL_eTlP5BTuFAYKS8t4sqVfh97hySVN3PW4NCcwy4=
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__WEBSERVER__SECRET_KEY=your-consistent-secret-key
     volumes:
       - ./airflow/dags:/opt/airflow/dags
+      - ./spark/jobs:/opt/spark-apps
+      - ./spark/config:/opt/spark-config
     command: celery worker
     healthcheck:
       test: ["CMD-SHELL", "celery --app airflow.executors.celery_executor.app inspect ping -d celery@$HOSTNAME"]
       interval: 30s
       timeout: 30s
       retries: 3
+    networks:
+      - nlhtung-net
 
 volumes:
   zookeeper_data:
@@ -289,3 +337,7 @@ volumes:
   minio_data:
   airflow_postgres_data:
   airflow_redis_data:
+
+networks:
+  nlhtung-net:
+    driver: bridge
