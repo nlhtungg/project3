@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+<configuration>
+  <!-- Hive Metastore Database Configuration -->
+  <property>
+    <name>javax.jdo.option.ConnectionURL</name>
+    <value>jdbc:postgresql://postgres:5432/hive</value>
+    <description>JDBC connect string for a JDBC metastore</description>
+  </property>
+  
+  <property>
+    <name>javax.jdo.option.ConnectionDriverName</name>
+    <value>org.postgresql.Driver</value>
+    <description>Driver class name for a JDBC metastore</description>
+  </property>
+  
+  <property>
+    <name>javax.jdo.option.ConnectionUserName</name>
+    <value>hive</value>
+    <description>Username to use against metastore database</description>
+  </property>
+  
+  <property>
+    <name>javax.jdo.option.ConnectionPassword</name>
+    <value>hivepw</value>
+    <description>Password to use against metastore database</description>
+  </property>
+
+  <!-- Hive Metastore Service Configuration -->
+  <property>
+    <name>hive.metastore.uris</name>
+    <value>thrift://hive-metastore:9083</value>
+    <description>Thrift URI for the remote metastore</description>
+  </property>
+
+  <!-- Warehouse directory configuration -->
+  <property>
+    <name>hive.metastore.warehouse.dir</name>
+    <value>s3a://bronze/warehouse</value>
+    <description>location of default database for the warehouse</description>
+  </property>
+
+  <!-- Auto create schema -->
+  <property>
+    <name>datanucleus.autoCreateSchema</name>
+    <value>true</value>
+  </property>
+  
+  <property>
+    <name>datanucleus.autoCreateTables</name>
+    <value>true</value>
+  </property>
+  
+  <property>
+    <name>datanucleus.autoCreateColumns</name>
+    <value>true</value>
+  </property>
+</configuration>
