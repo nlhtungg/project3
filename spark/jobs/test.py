@@ -1,5 +1,6 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
+from delta.tables import DeltaTable
 
 # ============================================================
 # 1️⃣ Khởi tạo SparkSession (đã có config từ spark-defaults.conf & hive-site.xml)
@@ -19,7 +20,7 @@ spark = (
 data = [
     (1, "Alice", "2025-10-28"),
     (2, "Bob", "2025-10-28"),
-    (3, "Charlie", "2025-10-28"),
+    (3, "Charlie Puth", "2025-10-28"),
 ]
 columns = ["id", "name", "ingest_date"]
 
@@ -30,9 +31,9 @@ df = df.withColumn("ingest_ts", F.current_timestamp())
 # 3️⃣ Khai báo database, table, path
 # ============================================================
 db_name = "bronze"
-table_name = "people"
+table_name = "peoples"
 full_table_name = f"{db_name}.{table_name}"
-delta_path = f"s3a://bronze/{db_name}/{table_name}"
+delta_path = f"s3a://{db_name}/{table_name}"
 
 # ============================================================
 # 4️⃣ Tạo database nếu chưa có (đăng ký trong Hive)
@@ -42,18 +43,41 @@ spark.sql(f"CREATE DATABASE IF NOT EXISTS {db_name}")
 print(f"✅ Database created/verified")
 
 # ============================================================
-# 5️⃣ Ghi dữ liệu Delta (chỉ write, chưa đăng ký Hive)
+# 5️⃣ Ghi dữ liệu Delta bằng UPSERT (MERGE)
 # ============================================================
-print(f"📝 Writing Delta table to: {delta_path}")
-(
-    df.write
-      .format("delta")
-      .mode("overwrite")
-      .option("overwriteSchema", "true")
-      .save(delta_path)  # Use save() instead of saveAsTable()
-)
 
-print(f"✅ Delta data written successfully!")
+print(f"📝 Upserting data to Delta table: {delta_path}")
+
+# Check if table exists
+try:
+    # Table exists - perform MERGE (upsert)
+    deltaTable = DeltaTable.forPath(spark, delta_path)
+    
+    print("🔄 Table exists, performing MERGE (upsert)...")
+    (
+        deltaTable.alias("target")
+        .merge(
+            df.alias("source"),
+            "target.id = source.id"  # Merge condition (primary key)
+        )
+        .whenMatchedUpdateAll()  # Update existing records
+        .whenNotMatchedInsertAll()  # Insert new records
+        .execute()
+    )
+    print(f"✅ Data upserted successfully!")
+    
+except Exception as e:
+    # Table doesn't exist - create it with initial data
+    print(f"📝 Table doesn't exist, creating new table...")
+    (
+        df.write
+          .format("delta")
+          .mode("overwrite")
+          .option("overwriteSchema", "true")
+          .save(delta_path)
+    )
+    print(f"✅ Initial data written successfully!")
+
 print(f"📂 Location: {delta_path}")
 
 # ============================================================
