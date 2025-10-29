@@ -1,87 +1,87 @@
 services:
 
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.7.0
-    container_name: zookeeper
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    volumes:
-      - zookeeper_data:/var/lib/zookeeper/data
-    networks:
-      - nlhtung-net
+  # zookeeper:
+  #   image: confluentinc/cp-zookeeper:7.7.0
+  #   container_name: zookeeper
+  #   environment:
+  #     ZOOKEEPER_CLIENT_PORT: 2181
+  #     ZOOKEEPER_TICK_TIME: 2000
+  #   volumes:
+  #     - zookeeper_data:/var/lib/zookeeper/data
+  #   networks:
+  #     - nlhtung-net
 
-  kafka-1:
-    image: confluentinc/cp-kafka:7.7.0
-    container_name: kafka-1
-    depends_on:
-      - zookeeper
-    ports:
-      - "9092:9092"
-      - "29092:29092"
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:9092,PLAINTEXT_HOST://localhost:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL: PLAINTEXT
-      KAFKA_LISTENER_PORT: 9092
-      KAFKA_LISTENER_HOST: kafka-1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-    healthcheck:
-      test: ["CMD-SHELL", "cub kafka-ready -b kafka-1:9092 1 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    volumes:
-      - kafka_data_1:/var/lib/kafka/data
-    networks:
-      - nlhtung-net
+  # kafka-1:
+  #   image: confluentinc/cp-kafka:7.7.0
+  #   container_name: kafka-1
+  #   depends_on:
+  #     - zookeeper
+  #   ports:
+  #     - "9092:9092"
+  #     - "29092:29092"
+  #   environment:
+  #     KAFKA_BROKER_ID: 1
+  #     KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+  #     KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:9092,PLAINTEXT_HOST://localhost:29092
+  #     KAFKA_LISTENER_SECURITY_PROTOCOL: PLAINTEXT
+  #     KAFKA_LISTENER_PORT: 9092
+  #     KAFKA_LISTENER_HOST: kafka-1
+  #     KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+  #     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+  #     KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "cub kafka-ready -b kafka-1:9092 1 1"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   volumes:
+  #     - kafka_data_1:/var/lib/kafka/data
+  #   networks:
+  #     - nlhtung-net
 
-  kafka-2:
-    image: confluentinc/cp-kafka:7.7.0
-    container_name: kafka-2
-    depends_on:
-      - zookeeper
-    ports:
-      - "9093:9092"
-      - "29093:29092"
-    environment:
-      KAFKA_BROKER_ID: 2
-      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:9092,PLAINTEXT_HOST://localhost:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL: PLAINTEXT
-      KAFKA_LISTENER_PORT: 9092
-      KAFKA_LISTENER_HOST: kafka-2
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-    healthcheck:
-      test: ["CMD-SHELL", "cub kafka-ready -b kafka-2:9092 1 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    volumes:
-      - kafka_data_2:/var/lib/kafka/data
-    networks:
-      - nlhtung-net
+  # kafka-2:
+  #   image: confluentinc/cp-kafka:7.7.0
+  #   container_name: kafka-2
+  #   depends_on:
+  #     - zookeeper
+  #   ports:
+  #     - "9093:9092"
+  #     - "29093:29092"
+  #   environment:
+  #     KAFKA_BROKER_ID: 2
+  #     KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+  #     KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:9092,PLAINTEXT_HOST://localhost:29092
+  #     KAFKA_LISTENER_SECURITY_PROTOCOL: PLAINTEXT
+  #     KAFKA_LISTENER_PORT: 9092
+  #     KAFKA_LISTENER_HOST: kafka-2
+  #     KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+  #     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+  #     KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "cub kafka-ready -b kafka-2:9092 1 1"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   volumes:
+  #     - kafka_data_2:/var/lib/kafka/data
+  #   networks:
+  #     - nlhtung-net
 
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: kafka-ui
-    depends_on:
-      - kafka-1
-      - kafka-2
-    ports:
-      - "8085:8080"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:9092,kafka-2:9092
-    networks:
-      - nlhtung-net
+  # kafka-ui:
+  #   image: provectuslabs/kafka-ui:latest
+  #   container_name: kafka-ui
+  #   depends_on:
+  #     - kafka-1
+  #     #- kafka-2
+  #   ports:
+  #     - "8085:8080"
+  #   environment:
+  #     KAFKA_CLUSTERS_0_NAME: local
+  #     KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:9092 #,kafka-2:9092
+  #   networks:
+  #     - nlhtung-net
 
   minio:
     image: minio/minio:latest
@@ -125,7 +125,10 @@ services:
     ports:
       - "8080:8080" 
       - "7077:7077"
+      - "4040:4040"
     volumes:
+      - ./spark/config/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
+      - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
       - ./spark/jobs:/opt/spark-apps
     networks:
       - nlhtung-net
@@ -146,27 +149,28 @@ services:
       - spark-master
     volumes:
       - ./spark/jobs:/opt/spark-apps
+      - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
     networks:
       - nlhtung-net
   
-  spark-worker-2:
-    build:
-      context: .
-      dockerfile: spark/Dockerfile
-    container_name: spark-worker-2
-    environment:
-      - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark-master:7077
-      - SPARK_WORKER_CORES=2
-      - SPARK_WORKER_MEMORY=2g
-    ports:
-      - "8082:8081"
-    depends_on:
-      - spark-master
-    volumes:
-      - ./spark/jobs:/opt/spark-apps
-    networks:
-      - nlhtung-net
+  # spark-worker-2:
+  #   build:
+  #     context: .
+  #     dockerfile: spark/Dockerfile
+  #   container_name: spark-worker-2
+  #   environment:
+  #     - SPARK_MODE=worker
+  #     - SPARK_MASTER_URL=spark://spark-master:7077
+  #     - SPARK_WORKER_CORES=2
+  #     - SPARK_WORKER_MEMORY=2g
+  #   ports:
+  #     - "8082:8081"
+  #   depends_on:
+  #     - spark-master
+  #   volumes:
+  #     - ./spark/jobs:/opt/spark-apps
+  #   networks:
+  #     - nlhtung-net
 
   postgres:
     image: postgres:15
@@ -193,14 +197,29 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    environment:
+      HIVE_METASTORE_DB_TYPE: postgres
+      HIVE_METASTORE_DB_HOST: postgres
+      HIVE_METASTORE_DB_PORT: 5432
+      HIVE_METASTORE_DB_NAME: hive
+      HIVE_METASTORE_DB_USER: hive
+      HIVE_METASTORE_DB_PASSWORD: hivepw
+      SERVICE_NAME: metastore
+      HADOOP_CLASSPATH: /opt/hive/lib/hadoop-aws-3.3.4.jar:/opt/hive/lib/aws-java-sdk-bundle-1.12.262.jar
     ports:
       - "9083:9083"
     volumes:
       - ./hive-metastore/hive-site.xml:/opt/hive/conf/hive-site.xml
       - ./jars/postgresql-42.7.7.jar:/opt/hive/lib/postgresql-42.7.7.jar
+      - ./jars/hadoop-aws-3.3.4.jar:/opt/hive/lib/hadoop-aws-3.3.4.jar
+      - ./jars/aws-java-sdk-bundle-1.12.262.jar:/opt/hive/lib/aws-java-sdk-bundle-1.12.262.jar
     entrypoint: >
-      bash -c "schematool -dbType postgres -initOrUpgradeSchema &&
-               hive --service metastore"
+      bash -c "
+      echo '⏳ Initializing Hive schema in PostgreSQL...';
+      /opt/hive/bin/schematool -dbType postgres -userName hive -passWord hivepw -url jdbc:postgresql://postgres:5432/hive -initSchema || echo '⚠️ Schema already initialized';
+      echo '✅ Hive schema ready, starting metastore service...';
+      /opt/hive/bin/hive --service metastore
+      "
     networks:
       - nlhtung-net
 
@@ -243,7 +262,7 @@ services:
       -c "
       airflow db init && 
       airflow users create --username admin --password admin --firstname admin --lastname user --role Admin --email admin@example.com &&
-      airflow connections add 'spark_master' --conn-type 'spark' --conn-host 'spark-master' --conn-port '7077'"
+      airflow connections add 'spark_master' --conn-type 'spark' --conn-host 'spark://spark-master' --conn-port '7077'"
     networks:
       - nlhtung-net
 
@@ -348,10 +367,34 @@ services:
     networks:
       - nlhtung-net
 
+  trino-coordinator:
+    image: trinodb/trino:414
+    container_name: trino-coordinator
+    ports:
+      - "8088:8080"
+    volumes:
+      - ./trino:/etc/trino/catalog
+    command: >
+      bash -c "/usr/lib/trino/bin/run-trino --server --coordinator"
+    networks:
+      - nlhtung-net
+
+  trino-worker:
+    image: trinodb/trino:414
+    container_name: trino-worker
+    depends_on:
+      - trino-coordinator
+    volumes:
+      - ./trino:/etc/trino/catalog
+    command: >
+      bash -c "/usr/lib/trino/bin/run-trino --server --worker"
+    networks:
+      - nlhtung-net
+
 volumes:
   zookeeper_data:
   kafka_data_1:
-  kafka_data_2:
+  #kafka_data_2:
   minio_data:
   postgres_data:
   airflow_redis_data:

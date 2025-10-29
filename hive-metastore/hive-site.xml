@@ -1,57 +1,111 @@
 <?xml version="1.0"?>
 <configuration>
-  <!-- Hive Metastore Database Configuration -->
-  <property>
-    <name>javax.jdo.option.ConnectionURL</name>
-    <value>jdbc:postgresql://postgres:5432/hive</value>
-    <description>JDBC connect string for a JDBC metastore</description>
-  </property>
-  
-  <property>
-    <name>javax.jdo.option.ConnectionDriverName</name>
-    <value>org.postgresql.Driver</value>
-    <description>Driver class name for a JDBC metastore</description>
-  </property>
-  
-  <property>
-    <name>javax.jdo.option.ConnectionUserName</name>
-    <value>hive</value>
-    <description>Username to use against metastore database</description>
-  </property>
-  
-  <property>
-    <name>javax.jdo.option.ConnectionPassword</name>
-    <value>hivepw</value>
-    <description>Password to use against metastore database</description>
-  </property>
 
-  <!-- Hive Metastore Service Configuration -->
+  <!-- Hive Metastore connection -->
   <property>
     <name>hive.metastore.uris</name>
     <value>thrift://hive-metastore:9083</value>
-    <description>Thrift URI for the remote metastore</description>
   </property>
 
-  <!-- Warehouse directory configuration -->
+  <!-- PostgreSQL backend -->
+  <property>
+    <name>javax.jdo.option.ConnectionURL</name>
+    <value>jdbc:postgresql://postgres:5432/hive</value>
+  </property>
+
+  <property>
+    <name>javax.jdo.option.ConnectionDriverName</name>
+    <value>org.postgresql.Driver</value>
+  </property>
+
+  <property>
+    <name>javax.jdo.option.ConnectionUserName</name>
+    <value>hive</value>
+  </property>
+
+  <property>
+    <name>javax.jdo.option.ConnectionPassword</name>
+    <value>hivepw</value>
+  </property>
+
+  <!-- Warehouse path (MinIO bucket) -->
   <property>
     <name>hive.metastore.warehouse.dir</name>
-    <value>s3a://bronze/warehouse</value>
-    <description>location of default database for the warehouse</description>
+    <value>s3a://bronze/</value>
   </property>
 
-  <!-- Auto create schema -->
+  <!-- Schema + retry config -->
   <property>
-    <name>datanucleus.autoCreateSchema</name>
+    <name>datanucleus.schema.autoCreateAll</name>
     <value>true</value>
   </property>
-  
+
   <property>
-    <name>datanucleus.autoCreateTables</name>
+    <name>hive.metastore.schema.verification</name>
+    <value>false</value>
+  </property>
+
+  <property>
+    <name>hive.metastore.connect.retries</name>
+    <value>5</value>
+  </property>
+
+  <!-- S3A / MinIO Configuration -->
+  <property>
+    <name>fs.s3a.endpoint</name>
+    <value>http://minio:9000</value>
+  </property>
+
+  <property>
+    <name>fs.s3a.access.key</name>
+    <value>minioadmin</value>
+  </property>
+
+  <property>
+    <name>fs.s3a.secret.key</name>
+    <value>minioadmin</value>
+  </property>
+
+  <property>
+    <name>fs.s3a.path.style.access</name>
     <value>true</value>
   </property>
-  
+
   <property>
-    <name>datanucleus.autoCreateColumns</name>
-    <value>true</value>
+    <name>fs.s3a.connection.ssl.enabled</name>
+    <value>false</value>
   </property>
+
+  <property>
+    <name>fs.s3a.impl</name>
+    <value>org.apache.hadoop.fs.s3a.S3AFileSystem</value>
+  </property>
+
+  <!-- S3A Timeouts and Performance -->
+  <property>
+    <name>fs.s3a.connection.timeout</name>
+    <value>10000</value>
+  </property>
+
+  <property>
+    <name>fs.s3a.connection.establish.timeout</name>
+    <value>5000</value>
+  </property>
+
+  <property>
+    <name>fs.s3a.attempts.maximum</name>
+    <value>2</value>
+  </property>
+
+  <!-- Disable warehouse verification on startup to prevent hanging -->
+  <property>
+    <name>hive.metastore.warehouse.dir.sync</name>
+    <value>false</value>
+  </property>
+
+  <property>
+    <name>hive.metastore.fshandler.threads</name>
+    <value>10</value>
+  </property>
+
 </configuration>
