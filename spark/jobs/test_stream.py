@@ -68,10 +68,17 @@ delta_path = f"s3a://{db_name}/{table_name}"
 checkpoint_path = f"s3a://{db_name}/checkpoints/{table_name}"
 
 # ============================================================
-# 5️⃣ Create database if not exists
+# 5️⃣ Create database if not exists (with fallback handling)
 # ============================================================
 print(f"📋 Creating database: {db_name}")
-spark.sql(f"CREATE DATABASE IF NOT EXISTS {db_name}")
+hive_available = True
+try:
+    spark.sql(f"CREATE DATABASE IF NOT EXISTS {db_name}")
+    print(f"✅ Database {db_name} created/verified in Hive Metastore")
+except Exception as e:
+    print(f"⚠️  Hive Metastore unavailable: {e}")
+    print(f"📝 Will write to Delta catalog only (path: {delta_path})")
+    hive_available = False
 
 # ============================================================
 # 6️⃣ Write streaming data to Delta Lake
@@ -126,54 +133,82 @@ except KeyboardInterrupt:
     query.awaitTermination(timeout=10)
 
 # ============================================================
-# 8️⃣ Register table in Hive Metastore
+# 8️⃣ Register table in Hive Metastore (with fallback handling)
 # ============================================================
-print(f"\n📋 Registering table in Hive Metastore: {full_table_name}")
-
-try:
-    spark.sql(f"DROP TABLE IF EXISTS {full_table_name}")
-    
-    create_table_sql = f"""
-    CREATE TABLE IF NOT EXISTS {full_table_name}
-    USING DELTA
-    LOCATION '{delta_path}'
-    """
-    spark.sql(create_table_sql)
-    print(f"✅ Table registered: {full_table_name}")
-except Exception as e:
-    print(f"❌ Error during table registration: {e}")
+if hive_available:
+    print(f"\n📋 Registering table in Hive Metastore: {full_table_name}")
+    try:
+        spark.sql(f"DROP TABLE IF EXISTS {full_table_name}")
+        
+        create_table_sql = f"""
+        CREATE TABLE IF NOT EXISTS {full_table_name}
+        USING DELTA
+        LOCATION '{delta_path}'
+        """
+        spark.sql(create_table_sql)
+        print(f"✅ Table registered: {full_table_name}")
+    except Exception as e:
+        print(f"⚠️  Hive Metastore became unavailable during table registration: {e}")
+        print(f"📝 Data is safe in Delta Lake at: {delta_path}")
+        hive_available = False
+else:
+    print(f"\n⚠️  Skipping Hive Metastore registration (Metastore is down)")
+    print(f"📝 Data written to Delta Lake at: {delta_path}")
+    print(f"💡 You can read directly from path: spark.read.format('delta').load('{delta_path}')")
 
 # ============================================================
-# 9️⃣ Verify data was written
+# 9️⃣ Verify data was written (with fallback to direct Delta read)
 # ============================================================
 print("\n🔍 Verifying written data...")
 try:
-    result = spark.sql(f"SELECT * FROM {full_table_name} ORDER BY id DESC LIMIT 10")
-    print(f"\n📊 Latest 10 records in {full_table_name}:")
-    result.show(truncate=False)
-    
-    count_df = spark.sql(f"SELECT COUNT(*) as total_records FROM {full_table_name}")
-    total = count_df.collect()[0]['total_records']
-    print(f"\n✅ SUCCESS! Total records in table: {total}")
-    
-    # Show event type distribution
-    print(f"\n📈 Event type distribution:")
-    spark.sql(f"""
-        SELECT event_type, COUNT(*) as count 
-        FROM {full_table_name} 
-        GROUP BY event_type
-        ORDER BY count DESC
-    """).show()
+    if hive_available:
+        # Query via Hive Metastore
+        result = spark.sql(f"SELECT * FROM {full_table_name} ORDER BY id DESC LIMIT 10")
+        print(f"\n📊 Latest 10 records in {full_table_name}:")
+        result.show(truncate=False)
+        
+        count_df = spark.sql(f"SELECT COUNT(*) as total_records FROM {full_table_name}")
+        total = count_df.collect()[0]['total_records']
+        print(f"\n✅ SUCCESS! Total records in table: {total}")
+        
+        # Show event type distribution
+        print(f"\n📈 Event type distribution:")
+        spark.sql(f"""
+            SELECT event_type, COUNT(*) as count 
+            FROM {full_table_name} 
+            GROUP BY event_type
+            ORDER BY count DESC
+        """).show()
+    else:
+        # Query directly from Delta path
+        print(f"📂 Reading directly from Delta Lake path: {delta_path}")
+        result = spark.read.format("delta").load(delta_path).orderBy(F.col("id").desc()).limit(10)
+        print(f"\n📊 Latest 10 records from Delta Lake:")
+        result.show(truncate=False)
+        
+        count_df = spark.read.format("delta").load(delta_path).count()
+        print(f"\n✅ SUCCESS! Total records in Delta table: {count_df}")
+        
+        # Show event type distribution
+        print(f"\n📈 Event type distribution:")
+        spark.read.format("delta").load(delta_path).groupBy("event_type").count().orderBy(F.col("count").desc()).show()
     
 except Exception as e:
-    print(f"❌ Table query failed: {e}")
+    print(f"❌ Data verification failed: {e}")
+    print(f"💡 Try reading directly: spark.read.format('delta').load('{delta_path}').show()")
 
 print("\n" + "=" * 60)
 print("✅ STREAMING TEST COMPLETE!")
 print(f"📂 Delta table location: {delta_path}")
 print(f"📍 Checkpoint location: {checkpoint_path}")
-print(f"🗃️  Hive table: {full_table_name}")
-print("💡 You can query this table from Trino or Spark SQL")
+if hive_available:
+    print(f"🗃️  Hive table: {full_table_name}")
+    print("💡 You can query this table from Trino or Spark SQL")
+else:
+    print(f"⚠️  Hive Metastore: UNAVAILABLE")
+    print(f"💡 Query directly from path:")
+    print(f"   spark.read.format('delta').load('{delta_path}').show()")
+    print(f"   Or from Trino: SELECT * FROM delta.default.\"{table_name}$files\"")
 print("=" * 60)
 
 spark.stop()
