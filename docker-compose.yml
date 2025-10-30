@@ -74,12 +74,12 @@ services:
     container_name: kafka-ui
     depends_on:
       - kafka-1
-      - kafka-2
+      #- kafka-2
     ports:
       - "8085:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:9092,kafka-2:9092
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:9092 #,kafka-2:9092
     networks:
       - nlhtung-net
 
@@ -125,7 +125,10 @@ services:
     ports:
       - "8080:8080" 
       - "7077:7077"
+      - "4040:4040"
     volumes:
+      - ./spark/config/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
+      - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
       - ./spark/jobs:/opt/spark-apps
     networks:
       - nlhtung-net
@@ -146,6 +149,7 @@ services:
       - spark-master
     volumes:
       - ./spark/jobs:/opt/spark-apps
+      - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
     networks:
       - nlhtung-net
   
@@ -165,6 +169,58 @@ services:
       - spark-master
     volumes:
       - ./spark/jobs:/opt/spark-apps
+      - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
+    networks:
+      - nlhtung-net
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U postgres"]
+      interval: 10s
+      retries: 5
+    networks:
+      - nlhtung-net
+
+  hive-metastore:
+    image: apache/hive:4.0.0
+    container_name: hive-metastore
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      HIVE_METASTORE_DB_TYPE: postgres
+      HIVE_METASTORE_DB_HOST: postgres
+      HIVE_METASTORE_DB_PORT: 5432
+      HIVE_METASTORE_DB_NAME: hive
+      HIVE_METASTORE_DB_USER: hive
+      HIVE_METASTORE_DB_PASSWORD: hivepw
+      SERVICE_NAME: metastore
+      HADOOP_CLASSPATH: /opt/hive/lib/hadoop-aws-3.3.4.jar:/opt/hive/lib/aws-java-sdk-bundle-1.12.262.jar
+    ports:
+      - "9083:9083"
+    volumes:
+      - ./hive-metastore/hive-site.xml:/opt/hive/conf/hive-site.xml
+      - ./jars/postgresql-42.7.7.jar:/opt/hive/lib/postgresql-42.7.7.jar
+      - ./jars/hadoop-aws-3.3.4.jar:/opt/hive/lib/hadoop-aws-3.3.4.jar
+      - ./jars/aws-java-sdk-bundle-1.12.262.jar:/opt/hive/lib/aws-java-sdk-bundle-1.12.262.jar
+    entrypoint: >
+      bash -c "
+      echo '⏳ Initializing Hive schema in PostgreSQL...';
+      /opt/hive/bin/schematool -dbType postgres -userName hive -passWord hivepw -url jdbc:postgresql://postgres:5432/hive -initSchema || echo '⚠️ Schema already initialized';
+      echo '✅ Hive schema ready, starting metastore service...';
+      /opt/hive/bin/hive --service metastore
+      "
     networks:
       - nlhtung-net
 
@@ -181,39 +237,21 @@ services:
     networks:
       - nlhtung-net
 
-  airflow-postgres:
-    image: postgres:15
-    container_name: airflow-postgres
-    ports:
-      - "5433:5432"
-    environment:
-      - POSTGRES_USER=airflow
-      - POSTGRES_PASSWORD=airflow
-      - POSTGRES_DB=airflow
-    volumes:
-      - airflow_postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "airflow"]
-      interval: 5s
-      retries: 5
-    networks:
-      - nlhtung-net
-
   airflow-init:
     build:
       context: .
       dockerfile: airflow/Dockerfile
     container_name: airflow-init
     depends_on:
-      airflow-postgres:
+      postgres:
         condition: service_healthy
       airflow-redis:
         condition: service_healthy
     environment:
       - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
       - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
-      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres:5432/airflow
       - AIRFLOW__CORE__FERNET_KEY=z_lL_eTlP5BTuFAYKS8t4sqVfh97hySVN3PW4NCcwy4=
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
     volumes:
@@ -225,7 +263,7 @@ services:
       -c "
       airflow db init && 
       airflow users create --username admin --password admin --firstname admin --lastname user --role Admin --email admin@example.com &&
-      airflow connections add 'spark_master' --conn-type 'spark' --conn-host 'spark-master' --conn-port '7077'"
+      airflow connections add 'spark_master' --conn-type 'spark' --conn-host 'spark://spark-master' --conn-port '7077'"
     networks:
       - nlhtung-net
 
@@ -237,15 +275,15 @@ services:
     depends_on:
       airflow-init:
         condition: service_completed_successfully
-      airflow-postgres:
+      postgres:
         condition: service_healthy
       airflow-redis:
         condition: service_healthy
     environment:
       - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
       - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
-      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres:5432/airflow
       - AIRFLOW__CORE__FERNET_KEY=z_lL_eTlP5BTuFAYKS8t4sqVfh97hySVN3PW4NCcwy4=
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__WEBSERVER__SECRET_KEY=your-consistent-secret-key
@@ -272,15 +310,15 @@ services:
     depends_on:
       airflow-init:
         condition: service_completed_successfully
-      airflow-postgres:
+      postgres:
         condition: service_healthy
       airflow-redis:
         condition: service_healthy
     environment:
       - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
       - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
-      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres:5432/airflow
       - AIRFLOW__CORE__FERNET_KEY=z_lL_eTlP5BTuFAYKS8t4sqVfh97hySVN3PW4NCcwy4=
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__WEBSERVER__SECRET_KEY=your-consistent-secret-key
@@ -305,15 +343,15 @@ services:
     depends_on:
       airflow-init:
         condition: service_completed_successfully
-      airflow-postgres:
+      postgres:
         condition: service_healthy
       airflow-redis:
         condition: service_healthy
     environment:
       - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
       - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
-      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres:5432/airflow
       - AIRFLOW__CORE__FERNET_KEY=z_lL_eTlP5BTuFAYKS8t4sqVfh97hySVN3PW4NCcwy4=
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__WEBSERVER__SECRET_KEY=your-consistent-secret-key
@@ -330,13 +368,77 @@ services:
     networks:
       - nlhtung-net
 
+  trino-coordinator:
+    image: trinodb/trino:414
+    container_name: trino-coordinator
+    ports:
+      - "8088:8080"
+    volumes:
+      - ./trino:/etc/trino/catalog
+    command: >
+      bash -c "/usr/lib/trino/bin/run-trino --server --coordinator"
+    networks:
+      - nlhtung-net
+
+  trino-worker:
+    image: trinodb/trino:414
+    container_name: trino-worker
+    depends_on:
+      - trino-coordinator
+    volumes:
+      - ./trino:/etc/trino/catalog
+    command: >
+      bash -c "/usr/lib/trino/bin/run-trino --server --worker"
+    networks:
+      - nlhtung-net
+
+  superset:
+    build:
+      context: .
+      dockerfile: superset/Dockerfile
+    container_name: superset
+    depends_on:
+      postgres:
+        condition: service_healthy
+      trino-coordinator:
+        condition: service_started
+    environment:
+      - SUPERSET_SECRET_KEY=supersetsecretkey
+      - SUPERSET_ENV=production
+      - DATABASE_DB=superset
+      - DATABASE_HOST=postgres
+      - DATABASE_PASSWORD=superset
+      - DATABASE_USER=superset
+      - DATABASE_PORT=5432
+      - DATABASE_DIALECT=postgresql
+      - SUPERSET_LOAD_EXAMPLES=no
+    ports:
+      - "8089:8088"
+    volumes:
+      - superset_data:/app/superset_home
+      - ./superset/superset_config.py:/app/superset_config/superset_config.py
+    command: >
+      bash -c "
+      superset db upgrade &&
+      superset fab create-admin --username admin --firstname Admin --lastname User --email admin@superset.com --password admin &&
+      superset init &&
+      superset run -h 0.0.0.0 -p 8088 --with-threads --reload --debugger"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8088/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - nlhtung-net
+
 volumes:
   zookeeper_data:
   kafka_data_1:
-  kafka_data_2:
+  #kafka_data_2:
   minio_data:
-  airflow_postgres_data:
+  postgres_data:
   airflow_redis_data:
+  superset_data:
 
 networks:
   nlhtung-net:

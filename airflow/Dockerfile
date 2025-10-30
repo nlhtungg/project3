@@ -17,12 +17,15 @@ RUN curl -L -o /tmp/spark.tgz https://archive.apache.org/dist/spark/spark-3.5.1/
 ENV SPARK_HOME=/opt/spark
 ENV PATH=$SPARK_HOME/bin:$PATH
 
-COPY ./jars/*.jar /opt/spark-3.5.1-bin-hadoop3/jars/
+# Copy compatible Hadoop 3.3.4 libraries and other JARs
+# This ensures S3A support matches Spark 3.5.1's bundled Hadoop version
+COPY ./jars/*.jar /opt/spark/jars/
 
 # --- Switch back to airflow user ---
 USER airflow
 
 # pyspark version phải trùng Spark binary
 RUN pip install pyspark==3.5.1 \
+    && pip install delta-spark==3.2.0 \
     && pip install pyarrow datetime requests beautifulsoup4 pendulum minio \
     && pip install apache-airflow-providers-apache-spark
