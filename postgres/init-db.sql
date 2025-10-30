@@ -11,3 +11,9 @@ CREATE DATABASE hive;
 CREATE USER hive WITH ENCRYPTED PASSWORD 'hivepw';
 GRANT ALL PRIVILEGES ON DATABASE hive TO hive;
 ALTER DATABASE hive OWNER TO hive;
+
+-- Create Superset database and user
+CREATE DATABASE superset;
+CREATE USER superset WITH ENCRYPTED PASSWORD 'superset';
+GRANT ALL PRIVILEGES ON DATABASE superset TO superset;
+ALTER DATABASE superset OWNER TO superset;
