@@ -3,6 +3,14 @@ services:
   kafka-1:
     image: confluentinc/cp-kafka:7.7.0
     container_name: kafka-1
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
     ports:
       - "9092:9092"
       - "29092:29092"
@@ -64,6 +72,14 @@ services:
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
     depends_on:
       - kafka-1
       #- kafka-2
@@ -78,6 +94,14 @@ services:
   minio:
     image: minio/minio:latest
     container_name: minio
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
     command: server /data --console-address ":9001"
     environment:
       MINIO_ACCESS_KEY: minioadmin
@@ -93,6 +117,11 @@ services:
   minio-init:
     image: minio/mc
     container_name: minio-init
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
     depends_on:
       - minio
     entrypoint: >
@@ -109,6 +138,14 @@ services:
       context: .
       dockerfile: spark/Dockerfile
     container_name: spark-master
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
     environment:
       - SPARK_MODE=master
       - SPARK_MASTER_HOST=spark-master
@@ -122,6 +159,7 @@ services:
       - ./spark/config/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
       - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
       - ./spark/jobs:/opt/spark-apps
+      - .env:/opt/.env
     networks:
       - nlhtung-net
 
@@ -130,6 +168,14 @@ services:
       context: .
       dockerfile: spark/Dockerfile
     container_name: spark-worker-1
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
@@ -142,6 +188,7 @@ services:
     volumes:
       - ./spark/jobs:/opt/spark-apps
       - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
+      - .env:/opt/.env
     networks:
       - nlhtung-net
   
@@ -150,6 +197,14 @@ services:
       context: .
       dockerfile: spark/Dockerfile
     container_name: spark-worker-2
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
@@ -162,12 +217,21 @@ services:
     volumes:
       - ./spark/jobs:/opt/spark-apps
       - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
+      - .env:/opt/.env
     networks:
       - nlhtung-net
 
   postgres:
     image: postgres:15
     container_name: postgres
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -187,6 +251,14 @@ services:
   hive-metastore:
     image: apache/hive:4.0.0
     container_name: hive-metastore
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
     depends_on:
       postgres:
         condition: service_healthy
@@ -219,6 +291,14 @@ services:
   airflow-redis:
     image: redis:7
     container_name: redis
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
     ports:
       - "6379:6379"
     healthcheck:
@@ -234,6 +314,11 @@ services:
       context: .
       dockerfile: airflow/Dockerfile
     container_name: airflow-init
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
     depends_on:
       postgres:
         condition: service_healthy
@@ -264,6 +349,14 @@ services:
       context: .
       dockerfile: airflow/Dockerfile
     container_name: airflow-webserver
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
     depends_on:
       airflow-init:
         condition: service_completed_successfully
@@ -283,6 +376,7 @@ services:
       - ./airflow/dags:/opt/airflow/dags
       - ./spark/jobs:/opt/spark-apps
       - ./spark/config:/opt/spark-config
+      - .env:/opt/.env
     ports:
       - "8686:8080"
     command: webserver
@@ -299,6 +393,14 @@ services:
       context: .
       dockerfile: airflow/Dockerfile
     container_name: airflow-scheduler
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
     depends_on:
       airflow-init:
         condition: service_completed_successfully
@@ -318,6 +420,7 @@ services:
       - ./airflow/dags:/opt/airflow/dags
       - ./spark/jobs:/opt/spark-apps
       - ./spark/config:/opt/spark-config
+      - .env:/opt/.env
     command: scheduler
     healthcheck:
       test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --local"]
@@ -332,6 +435,14 @@ services:
       context: .
       dockerfile: airflow/Dockerfile
     container_name: airflow-worker
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
     depends_on:
       airflow-init:
         condition: service_completed_successfully
@@ -351,6 +462,7 @@ services:
       - ./airflow/dags:/opt/airflow/dags
       - ./spark/jobs:/opt/spark-apps
       - ./spark/config:/opt/spark-config
+      - .env:/opt/.env
     command: celery worker
     healthcheck:
       test: ["CMD-SHELL", "celery --app airflow.executors.celery_executor.app inspect ping -d celery@$HOSTNAME"]
@@ -363,6 +475,14 @@ services:
   trino-coordinator:
     image: trinodb/trino:414
     container_name: trino-coordinator
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
     ports:
       - "8088:8080"
     volumes:
@@ -375,6 +495,14 @@ services:
   trino-worker:
     image: trinodb/trino:414
     container_name: trino-worker
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
     depends_on:
       - trino-coordinator
     volumes:
@@ -389,6 +517,14 @@ services:
       context: .
       dockerfile: superset/Dockerfile
     container_name: superset
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
     depends_on:
       postgres:
         condition: service_healthy
