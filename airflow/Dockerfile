@@ -28,4 +28,5 @@ USER airflow
 RUN pip install pyspark==3.5.1 \
     && pip install delta-spark==3.2.0 \
     && pip install pyarrow datetime requests beautifulsoup4 pendulum minio \
-    && pip install apache-airflow-providers-apache-spark
+    && pip install apache-airflow-providers-apache-spark \
+    && pip install python-dotenv

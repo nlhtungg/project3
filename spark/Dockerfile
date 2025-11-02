@@ -9,4 +9,5 @@ COPY ./jars/*.jar /opt/bitnami/spark/jars/
 USER 1001
 
 # Install Delta Lake Python package
-RUN pip install delta-spark==3.2.0
+RUN pip install delta-spark==3.2.0 \
+    && pip install python-dotenv
