@@ -1,0 +1,17 @@
+---
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+whitelistObjectNames:
+  - "java.lang:type=Memory"
+  - "java.lang:type=GarbageCollector,*"
+  - "java.lang:type=Threading"
+  - "java.lang:type=Runtime"
+  - "java.lang:type=OperatingSystem"
+  - "metrics:name=*.driver.*"
+  - "metrics:name=*.executor.*"
+  - "metrics:name=*.DAGScheduler.*"
+  - "metrics:name=*.BlockManager.*"
+  - "metrics:name=*.jvm.*"
+blacklistObjectNames: []
+rules:
+  - pattern: ".*"

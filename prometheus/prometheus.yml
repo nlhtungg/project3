@@ -1,7 +1,29 @@
 global:
   scrape_interval: 15s
+  evaluation_interval: 15s
 
 scrape_configs:
+  # Prometheus self-monitoring
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
+
+  # Kafka metrics via kafka-exporter
+  - job_name: 'kafka'
+    static_configs:
+      - targets: ['kafka-exporter:9308']
+
+  # Postgres & Airflow DB metrics
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+
+  # Spark Master JMX metrics
+  - job_name: 'spark-master'
+    static_configs:
+      - targets: ['spark-master:8090']
+
+  # Spark Workers JMX metrics
+  - job_name: 'spark-workers'
+    static_configs:
+      - targets: ['spark-worker-1:8091', 'spark-worker-2:8092']

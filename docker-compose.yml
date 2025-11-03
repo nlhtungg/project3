@@ -151,12 +151,16 @@ services:
       - SPARK_MASTER_HOST=spark-master
       - SPARK_MASTER_PORT=7077
       - SPARK_MASTER_WEBUI_PORT=8080
+      - SPARK_METRICS_NAMESPACE=spark_master
+      - SPARK_DAEMON_JAVA_OPTS=-javaagent:/opt/bitnami/spark/jars/jmx_prometheus_javaagent-0.20.0.jar=8090:/opt/bitnami/spark/conf/jmx-exporter-config.yaml
     ports:
       - "8080:8080" 
       - "7077:7077"
       - "4040:4040"
+      - "8090:8090"
     volumes:
       - ./spark/config/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
+      - ./spark/config/jmx-exporter-config.yaml:/opt/bitnami/spark/conf/jmx-exporter-config.yaml
       - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
       - ./spark/jobs:/opt/spark-apps
       - .env:/opt/.env
@@ -181,11 +185,15 @@ services:
       - SPARK_MASTER_URL=spark://spark-master:7077
       - SPARK_WORKER_CORES=2
       - SPARK_WORKER_MEMORY=2g
+      - SPARK_METRICS_NAMESPACE=spark_worker_1
+      - SPARK_DAEMON_JAVA_OPTS=-javaagent:/opt/bitnami/spark/jars/jmx_prometheus_javaagent-0.20.0.jar=8091:/opt/bitnami/spark/conf/jmx-exporter-config.yaml
     ports:
       - "8081:8081"
+      - "8091:8091"
     depends_on:
       - spark-master
     volumes:
+      - ./spark/config/jmx-exporter-config.yaml:/opt/bitnami/spark/conf/jmx-exporter-config.yaml
       - ./spark/jobs:/opt/spark-apps
       - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
       - .env:/opt/.env
@@ -210,11 +218,15 @@ services:
       - SPARK_MASTER_URL=spark://spark-master:7077
       - SPARK_WORKER_CORES=2
       - SPARK_WORKER_MEMORY=2g
+      - SPARK_METRICS_NAMESPACE=spark_worker_2
+      - SPARK_DAEMON_JAVA_OPTS=-javaagent:/opt/bitnami/spark/jars/jmx_prometheus_javaagent-0.20.0.jar=8092:/opt/bitnami/spark/conf/jmx-exporter-config.yaml
     ports:
       - "8082:8081"
+      - "8092:8092"
     depends_on:
       - spark-master
     volumes:
+      - ./spark/config/jmx-exporter-config.yaml:/opt/bitnami/spark/conf/jmx-exporter-config.yaml
       - ./spark/jobs:/opt/spark-apps
       - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
       - .env:/opt/.env
@@ -562,14 +574,70 @@ services:
   prometheus:
     image: prom/prometheus:v2.49.1
     container_name: prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
     ports:
       - "9090:9090"
+    depends_on:
+      - kafka-exporter
+      - postgres-exporter
+    networks:
+      - nlhtung-net
+
+  # Kafka Exporter - Official Prometheus exporter for Kafka
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:latest
+    container_name: kafka-exporter
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    command:
+      - '--kafka.server=kafka-1:9092'
+    ports:
+      - "9308:9308"
+    depends_on:
+      - kafka-1
+    networks:
+      - nlhtung-net
+
+  # Postgres Exporter - Monitor Airflow & Postgres databases
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: postgres-exporter
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:postgres@postgres:5432/postgres?sslmode=disable"
+    ports:
+      - "9187:9187"
+    depends_on:
+      - postgres
+    networks:
+      - nlhtung-net
 
   grafana:
     image: grafana/grafana:10.4.2
     container_name: grafana
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
     ports:
       - "3000:3000"
     environment:
@@ -579,9 +647,14 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
       - GF_AUTH_DISABLE_LOGIN_FORM=false
     volumes:
+      - grafana_data:/var/lib/grafana
       - ./grafana/dashboards:/etc/grafana/dashboards
       - ./grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
       - ./grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - nlhtung-net
 
 volumes:
   kafka_data_1:
@@ -589,6 +662,8 @@ volumes:
   postgres_data:
   airflow_redis_data:
   superset_data:
+  prometheus_data:
+  grafana_data:
 
 networks:
   nlhtung-net:
