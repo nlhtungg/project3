@@ -1,5 +1,6 @@
 .env
 jars/
 __pycache__/
-src/ingest/
 docs/
+src/utils/
+*.json

@@ -3,105 +3,74 @@ services:
   kafka-1:
     image: confluentinc/cp-kafka:7.7.0
     container_name: kafka-1
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
     ports:
-      - "9092:9092"
-      - "29092:29092"
+      - "9092:9094"
       - "9093:9093"
     environment:
       KAFKA_NODE_ID: 1
+      KAFKA_BROKER_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:9092,PLAINTEXT_HOST://localhost:29092
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:9093
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:29092
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:9093,2@kafka-2:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,EXTERNAL://0.0.0.0:9094,CONTROLLER://kafka-1:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:9092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
-    healthcheck:
-      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     volumes:
       - kafka_data_1:/var/lib/kafka/data
     networks:
       - nlhtung-net
 
-  # kafka-2:
-  #   image: confluentinc/cp-kafka:7.7.0
-  #   container_name: kafka-2
-  #   depends_on:
-  #     - zookeeper
-  #   ports:
-  #     - "9093:9092"
-  #     - "29093:29092"
-  #   environment:
-  #     KAFKA_BROKER_ID: 2
-  #     KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-  #     KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:9092,PLAINTEXT_HOST://localhost:29092
-  #     KAFKA_LISTENER_SECURITY_PROTOCOL: PLAINTEXT
-  #     KAFKA_LISTENER_PORT: 9092
-  #     KAFKA_LISTENER_HOST: kafka-2
-  #     KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-  #     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-  #     KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "cub kafka-ready -b kafka-2:9092 1 1"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
-  #   volumes:
-  #     - kafka_data_2:/var/lib/kafka/data
-  #   networks:
-  #     - nlhtung-net
+  kafka-2:
+    image: confluentinc/cp-kafka:7.7.0
+    container_name: kafka-2
+    ports:
+      - "9192:9094"
+      - "9193:9093"
+    environment:
+      KAFKA_NODE_ID: 2
+      KAFKA_BROKER_ID: 2
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:9093,2@kafka-2:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,EXTERNAL://0.0.0.0:9094,CONTROLLER://kafka-2:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:9092,EXTERNAL://localhost:9192
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - kafka_data_2:/var/lib/kafka/data
+    networks:
+      - nlhtung-net
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
     depends_on:
       - kafka-1
-      #- kafka-2
+      - kafka-2
     ports:
       - "8085:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:9092 #,kafka-2:9092
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:9092,kafka-2:9092
     networks:
       - nlhtung-net
 
   minio:
     image: minio/minio:latest
     container_name: minio
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
     command: server /data --console-address ":9001"
     environment:
       MINIO_ACCESS_KEY: minioadmin
@@ -117,11 +86,6 @@ services:
   minio-init:
     image: minio/mc
     container_name: minio-init
-    deploy:
-      resources:
-        limits:
-          cpus: '0.25'
-          memory: 128M
     depends_on:
       - minio
     entrypoint: >
@@ -138,29 +102,17 @@ services:
       context: .
       dockerfile: spark/Dockerfile
     container_name: spark-master
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 2G
-        reservations:
-          cpus: '1.0'
-          memory: 1G
     environment:
       - SPARK_MODE=master
       - SPARK_MASTER_HOST=spark-master
       - SPARK_MASTER_PORT=7077
       - SPARK_MASTER_WEBUI_PORT=8080
-      - SPARK_METRICS_NAMESPACE=spark_master
-      - SPARK_DAEMON_JAVA_OPTS=-javaagent:/opt/bitnami/spark/jars/jmx_prometheus_javaagent-0.20.0.jar=8090:/opt/bitnami/spark/conf/jmx-exporter-config.yaml
     ports:
       - "8080:8080" 
       - "7077:7077"
       - "4040:4040"
-      - "8090:8090"
     volumes:
       - ./spark/config/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
-      - ./spark/config/jmx-exporter-config.yaml:/opt/bitnami/spark/conf/jmx-exporter-config.yaml
       - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
       - ./spark/jobs:/opt/spark-apps
       - .env:/opt/.env
@@ -172,28 +124,16 @@ services:
       context: .
       dockerfile: spark/Dockerfile
     container_name: spark-worker-1
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 2G
-        reservations:
-          cpus: '1.0'
-          memory: 1G
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
       - SPARK_WORKER_CORES=2
       - SPARK_WORKER_MEMORY=2g
-      - SPARK_METRICS_NAMESPACE=spark_worker_1
-      - SPARK_DAEMON_JAVA_OPTS=-javaagent:/opt/bitnami/spark/jars/jmx_prometheus_javaagent-0.20.0.jar=8091:/opt/bitnami/spark/conf/jmx-exporter-config.yaml
     ports:
       - "8081:8081"
-      - "8091:8091"
     depends_on:
       - spark-master
     volumes:
-      - ./spark/config/jmx-exporter-config.yaml:/opt/bitnami/spark/conf/jmx-exporter-config.yaml
       - ./spark/jobs:/opt/spark-apps
       - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
       - .env:/opt/.env
@@ -205,28 +145,16 @@ services:
       context: .
       dockerfile: spark/Dockerfile
     container_name: spark-worker-2
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 2G
-        reservations:
-          cpus: '1.0'
-          memory: 1G
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
       - SPARK_WORKER_CORES=2
       - SPARK_WORKER_MEMORY=2g
-      - SPARK_METRICS_NAMESPACE=spark_worker_2
-      - SPARK_DAEMON_JAVA_OPTS=-javaagent:/opt/bitnami/spark/jars/jmx_prometheus_javaagent-0.20.0.jar=8092:/opt/bitnami/spark/conf/jmx-exporter-config.yaml
     ports:
       - "8082:8081"
-      - "8092:8092"
     depends_on:
       - spark-master
     volumes:
-      - ./spark/config/jmx-exporter-config.yaml:/opt/bitnami/spark/conf/jmx-exporter-config.yaml
       - ./spark/jobs:/opt/spark-apps
       - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
       - .env:/opt/.env
@@ -236,14 +164,6 @@ services:
   postgres:
     image: postgres:15
     container_name: postgres
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -263,14 +183,6 @@ services:
   hive-metastore:
     image: apache/hive:4.0.0
     container_name: hive-metastore
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
     depends_on:
       postgres:
         condition: service_healthy
@@ -303,14 +215,6 @@ services:
   airflow-redis:
     image: redis:7
     container_name: redis
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
     ports:
       - "6379:6379"
     healthcheck:
@@ -326,11 +230,6 @@ services:
       context: .
       dockerfile: airflow/Dockerfile
     container_name: airflow-init
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
     depends_on:
       postgres:
         condition: service_healthy
@@ -361,14 +260,6 @@ services:
       context: .
       dockerfile: airflow/Dockerfile
     container_name: airflow-webserver
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
     depends_on:
       airflow-init:
         condition: service_completed_successfully
@@ -405,14 +296,6 @@ services:
       context: .
       dockerfile: airflow/Dockerfile
     container_name: airflow-scheduler
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
     depends_on:
       airflow-init:
         condition: service_completed_successfully
@@ -447,14 +330,6 @@ services:
       context: .
       dockerfile: airflow/Dockerfile
     container_name: airflow-worker
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 2G
-        reservations:
-          cpus: '1.0'
-          memory: 1G
     depends_on:
       airflow-init:
         condition: service_completed_successfully
@@ -487,14 +362,6 @@ services:
   trino-coordinator:
     image: trinodb/trino:414
     container_name: trino-coordinator
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 2G
-        reservations:
-          cpus: '1.0'
-          memory: 1G
     ports:
       - "8088:8080"
     volumes:
@@ -507,14 +374,6 @@ services:
   trino-worker:
     image: trinodb/trino:414
     container_name: trino-worker
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 2G
-        reservations:
-          cpus: '1.0'
-          memory: 1G
     depends_on:
       - trino-coordinator
     volumes:
@@ -529,14 +388,6 @@ services:
       context: .
       dockerfile: superset/Dockerfile
     container_name: superset
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
     depends_on:
       postgres:
         condition: service_healthy
@@ -571,99 +422,37 @@ services:
     networks:
       - nlhtung-net
 
-  prometheus:
-    image: prom/prometheus:v2.49.1
-    container_name: prometheus
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.enable-lifecycle'
-    ports:
-      - "9090:9090"
-    depends_on:
-      - kafka-exporter
-      - postgres-exporter
-    networks:
-      - nlhtung-net
+  # prometheus:
+  #   image: prom/prometheus:v2.49.1
+  #   container_name: prometheus
+  #   volumes:
+  #     - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+  #   ports:
+  #     - "9090:9090"
 
-  # Kafka Exporter - Official Prometheus exporter for Kafka
-  kafka-exporter:
-    image: danielqsj/kafka-exporter:latest
-    container_name: kafka-exporter
-    deploy:
-      resources:
-        limits:
-          cpus: '0.25'
-          memory: 256M
-    command:
-      - '--kafka.server=kafka-1:9092'
-    ports:
-      - "9308:9308"
-    depends_on:
-      - kafka-1
-    networks:
-      - nlhtung-net
-
-  # Postgres Exporter - Monitor Airflow & Postgres databases
-  postgres-exporter:
-    image: prometheuscommunity/postgres-exporter:latest
-    container_name: postgres-exporter
-    deploy:
-      resources:
-        limits:
-          cpus: '0.25'
-          memory: 256M
-    environment:
-      DATA_SOURCE_NAME: "postgresql://postgres:postgres@postgres:5432/postgres?sslmode=disable"
-    ports:
-      - "9187:9187"
-    depends_on:
-      - postgres
-    networks:
-      - nlhtung-net
-
-  grafana:
-    image: grafana/grafana:10.4.2
-    container_name: grafana
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
-      - GF_AUTH_DISABLE_LOGIN_FORM=false
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/dashboards:/etc/grafana/dashboards
-      - ./grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
-      - ./grafana/datasources:/etc/grafana/provisioning/datasources
-    depends_on:
-      - prometheus
-    networks:
-      - nlhtung-net
+  # grafana:
+  #   image: grafana/grafana:10.4.2
+  #   container_name: grafana
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - GF_SECURITY_ADMIN_USER=admin
+  #     - GF_SECURITY_ADMIN_PASSWORD=admin
+  #     - GF_AUTH_ANONYMOUS_ENABLED=true
+  #     - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+  #     - GF_AUTH_DISABLE_LOGIN_FORM=false
+  #   volumes:
+  #     - ./grafana/dashboards:/etc/grafana/dashboards
+  #     - ./grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
+  #     - ./grafana/datasources:/etc/grafana/provisioning/datasources
 
 volumes:
   kafka_data_1:
+  kafka_data_2:
   minio_data:
   postgres_data:
   airflow_redis_data:
   superset_data:
-  prometheus_data:
-  grafana_data:
 
 networks:
   nlhtung-net:
