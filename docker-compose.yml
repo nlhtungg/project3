@@ -116,7 +116,7 @@ services:
       - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
       - ./spark/jobs:/opt/spark-apps
       - .env:/opt/.env
-      - ./src/transform:/opt/transform
+      - ./src:/opt/src
     networks:
       - nlhtung-net
 
@@ -138,7 +138,7 @@ services:
       - ./spark/jobs:/opt/spark-apps
       - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
       - .env:/opt/.env
-      - ./src/transform:/opt/transform
+      - ./src:/opt/src
     networks:
       - nlhtung-net
   
@@ -160,7 +160,7 @@ services:
       - ./spark/jobs:/opt/spark-apps
       - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
       - .env:/opt/.env
-      - ./src/transform:/opt/transform
+      - ./src:/opt/src
     networks:
       - nlhtung-net
 

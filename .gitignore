@@ -2,5 +2,4 @@
 jars/
 __pycache__/
 docs/
-src/utils/
 *.json
