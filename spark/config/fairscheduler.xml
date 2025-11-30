@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<!--
+Fair Scheduler Configuration for Multi-Job Lakehouse Pipeline
+Provides resource isolation between Bronze, Silver, and Gold layer jobs
+-->
+<allocations>
+  <!-- Bronze Layer Pool: High priority for data ingestion -->
+  <pool name="bronze">
+    <schedulingMode>FAIR</schedulingMode>
+    <weight>3</weight>
+    <minShare>2</minShare>
+    <maxRunningApps>5</maxRunningApps>
+  </pool>
+  
+  <!-- Silver Layer Pool: Medium priority for transformations -->
+  <pool name="silver">
+    <schedulingMode>FAIR</schedulingMode>
+    <weight>2</weight>
+    <minShare>1</minShare>
+    <maxRunningApps>3</maxRunningApps>
+  </pool>
+  
+  <!-- Gold Layer Pool: Lower priority for analytics -->
+  <pool name="gold">
+    <schedulingMode>FAIR</schedulingMode>
+    <weight>1</weight>
+    <minShare>1</minShare>
+    <maxRunningApps>2</maxRunningApps>
+  </pool>
+  
+  <!-- Default pool for other applications -->
+  <pool name="default">
+    <schedulingMode>FAIR</schedulingMode>
+    <weight>1</weight>
+    <minShare>1</minShare>
+    <maxRunningApps>2</maxRunningApps>
+  </pool>
+</allocations>

@@ -2,9 +2,10 @@ FROM bitnamilegacy/spark:3.5.1
 
 USER 1001
 
-# Install Delta Lake Python package
+# Install Delta Lake Python package and resource monitoring tools
 RUN pip install delta-spark==3.2.0 \
-    && pip install python-dotenv
+    && pip install python-dotenv \
+    && pip install psutil
 
 USER root
 

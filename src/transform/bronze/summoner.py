@@ -1,5 +1,5 @@
 from pyspark.sql import functions as F
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType
 import sys
 from pathlib import Path
 
@@ -7,12 +7,12 @@ PROJECT_SRC = Path(__file__).resolve().parents[2]  # .../src
 if str(PROJECT_SRC) not in sys.path:
     sys.path.insert(0, str(PROJECT_SRC))
 
-from common.io.spark_session import create_spark
+from common.io.spark_session import create_bronze_spark
 from common.io.kafka_stream import read_kafka_stream, parse_kafka_json
 from common.io.delta_io import build_paths, ensure_database, write_stream_to_delta, register_delta_table
 from common.config.delta import get_delta_config
 
-spark = create_spark("bronze-summoner-stream")
+spark = create_bronze_spark("bronze-summoner-stream")
 cfg = get_delta_config()
 
 layer = "bronze"
@@ -30,7 +30,7 @@ summoner_schema = StructType([
     StructField("leaguePoints", IntegerType(), True),
     StructField("wins", IntegerType(), True),
     StructField("losses", IntegerType(), True),
-    StructField("ingest_ts", StringType(), True),
+    StructField("ingest_ts", TimestampType(), True),
 ])
 
 kafka_df = read_kafka_stream(

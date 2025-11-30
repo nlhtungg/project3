@@ -7,6 +7,7 @@ import logging
 from datetime import datetime
 from kafka import KafkaProducer
 from kafka.errors import KafkaError
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -146,6 +147,33 @@ def get_league_entries(tier, division):
             "division": division
         }
 
+def fetch_and_process_one(tier, division, producer):
+    """Fetch league entries for one (tier, division) and send to Kafka"""
+    logger.info(f"[THREAD] Processing Tier: {tier}, Division: {division}")
+
+    league_data = get_league_entries(tier, division)
+
+    # Nếu response là dạng error (dict có key 'error')
+    if isinstance(league_data, dict) and "error" in league_data:
+        logger.error(f"API error for {tier} {division}: {league_data}")
+        return {
+            "tier": tier,
+            "division": division,
+            "sent": 0,
+            "failed": 1,
+        }
+
+    # Ngược lại parse & gửi vào Kafka
+    sent_count = producer.parse_and_send_summoners(tier, division, league_data)
+
+    return {
+        "tier": tier,
+        "division": division,
+        "sent": sent_count,
+        "failed": 0,
+    }
+
+
 def main():
     """Main function to fetch and produce league data to Kafka"""
     if not api_key:
@@ -156,30 +184,50 @@ def main():
     producer = KafkaLeagueProducer()
     
     try:
-        tiers = ["challenger", "grandmaster", "master", "DIAMOND", "PLATINUM", "GOLD", "SILVER", "BRONZE", "IRON"]
+        tiers = ["challenger", "grandmaster", "master",
+                 "DIAMOND", "PLATINUM", "GOLD", "SILVER", "BRONZE", "IRON"]
         total_summoners_sent = 0
         failed_requests = 0
-        
+
+        # Chuẩn bị list (tier, division) cần gọi API
+        tasks = []
         for tier in tiers:
             divisions = ["I", "II", "III", "IV"] if tier not in ["challenger", "grandmaster", "master"] else [""]
-            
             for division in divisions:
-                logger.info(f"Processing Tier: {tier}, Division: {division}")
-                
-                # Fetch data from Riot API
-                league_data = get_league_entries(tier, division)
-                
-                # Check if we got valid data (not an error response)
-                if isinstance(league_data, dict) and "error" in league_data:
-                    logger.error(f"API error for {tier} {division}: {league_data}")
+                tasks.append((tier, division))
+
+        # Số worker: có thể chỉnh nhỏ/lớn tùy rate limit & sức máy
+        max_workers = min(8, len(tasks))  # ví dụ tối đa 8 thread
+
+        logger.info(f"Starting ThreadPoolExecutor with max_workers={max_workers}, total tasks={len(tasks)}")
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_task = {
+                executor.submit(fetch_and_process_one, tier, division, producer): (tier, division)
+                for tier, division in tasks
+            }
+
+            for future in as_completed(future_to_task):
+                tier, division = future_to_task[future]
+                try:
+                    result = future.result()
+                    sent = result["sent"]
+                    failed = result["failed"]
+                    total_summoners_sent += sent
+                    failed_requests += failed
+
+                    logger.info(
+                        f"[DONE] Tier={tier}, Division={division} -> sent={sent}, failed={failed}"
+                    )
+                except Exception as e:
+                    logger.error(f"Unhandled exception for {tier} {division}: {e}")
                     failed_requests += 1
-                else:
-                    # Parse and send individual summoner messages
-                    sent_count = producer.parse_and_send_summoners(tier, division, league_data)
-                    total_summoners_sent += sent_count
-                
-                # Rate limiting - be respectful to the API
-                time.sleep(1.2)  # Riot API rate limit is typically 100 requests per 2 minutes
+
+        logger.info(
+            f"Data production complete. Total summoners sent: {total_summoners_sent}, "
+            f"Failed requests: {failed_requests}"
+        )
+
         
         logger.info(f"Data production complete. Total summoners sent: {total_summoners_sent}, Failed requests: {failed_requests}")
                 
