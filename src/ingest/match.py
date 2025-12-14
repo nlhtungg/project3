@@ -448,8 +448,7 @@ def create_kafka_producer() -> KafkaProducer:
         linger_ms=50,  # gộp message nhẹ
         batch_size=16384,
         retries=3,
-        acks='all',  # Wait for all replicas to acknowledge
-        enable_idempotence=True
+        acks='all'  # Wait for all replicas to acknowledge
     )
     return producer
 

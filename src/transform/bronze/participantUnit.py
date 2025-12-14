@@ -12,35 +12,39 @@ from common.io.kafka_stream import read_kafka_stream, parse_kafka_json
 from common.io.delta_io import build_paths, ensure_database, write_stream_to_delta, register_delta_table
 from common.config.delta import get_delta_config
 
-# Schema definition
-match_schema = StructType([
+# Schema for participant unit Kafka message
+participant_unit_schema = StructType([
     StructField("match_id", StringType(), True),
     StructField("gameId", IntegerType(), True),
-    StructField("game_datetime", DoubleType(), True),
-    StructField("game_length", DoubleType(), True),
-    StructField("game_version", StringType(), True),
-    StructField("tft_game_type", StringType(), True),
-    StructField("tft_set_core_name", StringType(), True),
-    StructField("tft_set_number", IntegerType(), True),
+    StructField("puuid", StringType(), True),
+    StructField("character_id", StringType(), True),
+    StructField("tier", IntegerType(), True),
+    StructField("item1", StringType(), True),
+    StructField("item2", StringType(), True),
+    StructField("item3", StringType(), True),
 ])
 
-def create_match_stream(spark: SparkSession, cfg=None):
-    """Create and return streaming query for TFT matches."""
+def create_participant_unit_stream(spark: SparkSession, cfg=None):
+    """Create and return streaming query for TFT participant units."""
     if cfg is None:
         cfg = get_delta_config()
     
     layer = "bronze"
-    table_name = "tft_matches"
+    table_name = "tft_participant_units"
     paths = build_paths(layer, table_name, cfg)
     
     ensure_database(spark, paths.db_name)
     
     kafka_df = read_kafka_stream(
         spark,
-        topic="tft_match",
-        group_id="match-bronze-consumer",
+        topic="tft_participant_unit",
+        group_id="participant-unit-bronze-consumer",
     )
-    parsed_df = parse_kafka_json(kafka_df, match_schema)
+    
+    # Parse Kafka message and include the message key
+    parsed_df = parse_kafka_json(kafka_df, participant_unit_schema)
+    
+    # Add message key and processing metadata
     df = (
         parsed_df
         .withColumn("processed_ts", F.current_timestamp())
@@ -60,6 +64,6 @@ def create_match_stream(spark: SparkSession, cfg=None):
     return query
 
 if __name__ == "__main__":
-    spark = create_bronze_spark("bronze-match-stream")
-    query = create_match_stream(spark)
+    spark = create_bronze_spark("bronze-participant-unit-stream")
+    query = create_participant_unit_stream(spark)
     query.awaitTermination()
