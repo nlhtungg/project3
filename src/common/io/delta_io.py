@@ -178,13 +178,30 @@ def read_stream_from_delta(
     data_path: str,
     ignore_changes: bool = True,
     ignore_deletes: bool = True,
+    max_files_per_trigger: Optional[int] = None,
+    max_bytes_per_trigger: Optional[str] = None,
 ):
     """
-    Đọc Delta như stream (như file test_read_stream.py). :contentReference[oaicite:5]{index=5}
+    Đọc Delta như stream với khả năng kiểm soát micro batch size.
+    
+    Args:
+        spark: SparkSession
+        data_path: Path to Delta table
+        ignore_changes: Ignore updates/deletes in source
+        ignore_deletes: Ignore deletes in source
+        max_files_per_trigger: Max number of files to process per trigger (limits backlog processing)
+        max_bytes_per_trigger: Max bytes to process per trigger (e.g., "1g", "500m")
     """
-    return (
+    reader = (
         spark.readStream.format("delta")
         .option("ignoreChanges", str(ignore_changes).lower())
         .option("ignoreDeletes", str(ignore_deletes).lower())
-        .load(data_path)
     )
+    
+    if max_files_per_trigger is not None:
+        reader = reader.option("maxFilesPerTrigger", str(max_files_per_trigger))
+    
+    if max_bytes_per_trigger is not None:
+        reader = reader.option("maxBytesPerTrigger", max_bytes_per_trigger)
+    
+    return reader.load(data_path)

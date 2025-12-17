@@ -3,3 +3,5 @@ jars/
 __pycache__/
 docs/
 *.json
+*.txt
+*.csv

@@ -164,6 +164,28 @@ services:
     networks:
       - nlhtung-net
 
+  spark-worker-3:
+    build:
+      context: .
+      dockerfile: spark/Dockerfile
+    container_name: spark-worker-3
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_MEMORY=2g
+    ports:
+      - "8083:8081"
+    depends_on:
+      - spark-master
+    volumes:
+      - ./spark/jobs:/opt/spark-apps
+      - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
+      - .env:/opt/.env
+      - ./src:/opt/src
+    networks:
+      - nlhtung-net
+
   postgres:
     image: postgres:15
     container_name: postgres
@@ -386,44 +408,44 @@ services:
     networks:
       - nlhtung-net
 
-  superset:
-    build:
-      context: .
-      dockerfile: superset/Dockerfile
-    container_name: superset
-    depends_on:
-      postgres:
-        condition: service_healthy
-      trino-coordinator:
-        condition: service_started
-    environment:
-      - SUPERSET_SECRET_KEY=supersetsecretkey
-      - SUPERSET_ENV=production
-      - DATABASE_DB=superset
-      - DATABASE_HOST=postgres
-      - DATABASE_PASSWORD=superset
-      - DATABASE_USER=superset
-      - DATABASE_PORT=5432
-      - DATABASE_DIALECT=postgresql
-      - SUPERSET_LOAD_EXAMPLES=no
-    ports:
-      - "8089:8088"
-    volumes:
-      - superset_data:/app/superset_home
-      - ./superset/superset_config.py:/app/superset_config/superset_config.py
-    command: >
-      bash -c "
-      superset db upgrade &&
-      superset fab create-admin --username admin --firstname Admin --lastname User --email admin@superset.com --password admin &&
-      superset init &&
-      superset run -h 0.0.0.0 -p 8088 --with-threads --reload --debugger"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8088/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    networks:
-      - nlhtung-net
+  # superset:
+  #   build:
+  #     context: .
+  #     dockerfile: superset/Dockerfile
+  #   container_name: superset
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     trino-coordinator:
+  #       condition: service_started
+  #   environment:
+  #     - SUPERSET_SECRET_KEY=supersetsecretkey
+  #     - SUPERSET_ENV=production
+  #     - DATABASE_DB=superset
+  #     - DATABASE_HOST=postgres
+  #     - DATABASE_PASSWORD=superset
+  #     - DATABASE_USER=superset
+  #     - DATABASE_PORT=5432
+  #     - DATABASE_DIALECT=postgresql
+  #     - SUPERSET_LOAD_EXAMPLES=no
+  #   ports:
+  #     - "8089:8088"
+  #   volumes:
+  #     - superset_data:/app/superset_home
+  #     - ./superset/superset_config.py:/app/superset_config/superset_config.py
+  #   command: >
+  #     bash -c "
+  #     superset db upgrade &&
+  #     superset fab create-admin --username admin --firstname Admin --lastname User --email admin@superset.com --password admin &&
+  #     superset init &&
+  #     superset run -h 0.0.0.0 -p 8088 --with-threads --reload --debugger"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "curl -f http://localhost:8088/health || exit 1"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #   networks:
+  #     - nlhtung-net
 
   # prometheus:
   #   image: prom/prometheus:v2.49.1

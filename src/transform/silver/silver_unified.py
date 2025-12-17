@@ -23,56 +23,60 @@ from transform.silver.participantUnit import create_participant_unit_silver_stre
 
 logger = get_logger("silver-unified")
 
-# Configuration for handling large bronze tables
-STARTUP_DELAY_SECONDS = 10  # Delay between starting each stream
-MAX_FILES_PER_TRIGGER = 50  # Limit files processed per trigger to prevent overload
+# Configuration for lightweight append-only processing
+STARTUP_DELAY_SECONDS = 5  # Delay between starting each stream
+MAX_BYTES_PER_TRIGGER = "50m"  # Larger batches now that merge is removed - 50MB per micro-batch
+RUN_CONCURRENTLY = True  # Run all 3 streams together
 
 
 def main():
     """
-    Run all silver layer SCD2 transformations in a single Spark session.
-    Streams are started sequentially with delays to handle large bronze tables.
+    Run all silver layer transformations in a single Spark session.
+    Uses append-only writes with batch deduplication for fast processing.
     Each transformation reads from a different bronze Delta table and writes to a different silver Delta table.
     """
-    logger.info("Starting unified silver layer streaming job")
-    logger.info(f"Configuration: startup_delay={STARTUP_DELAY_SECONDS}s, max_files_per_trigger={MAX_FILES_PER_TRIGGER}")
+    logger.info("Starting unified silver layer streaming job - APPEND MODE")
+    logger.info(f"Configuration: max_bytes_per_trigger={MAX_BYTES_PER_TRIGGER}, concurrent={RUN_CONCURRENTLY}")
     
     # Create a single Spark session for all transformations
     spark = create_silver_spark("silver-unified-stream")
     cfg = get_delta_config()
     
     try:
-        # Start streams sequentially with delays to prevent resource contention
-        logger.info("Starting match silver stream...")
-        query_match = create_match_silver_stream(spark, cfg, max_files_per_trigger=MAX_FILES_PER_TRIGGER)
-        logger.info(f"Match stream started with ID: {query_match.id}")
-        logger.info(f"Waiting {STARTUP_DELAY_SECONDS} seconds before starting next stream...")
-        time.sleep(STARTUP_DELAY_SECONDS)
-        
-        logger.info("Starting match participant silver stream...")
-        query_participant = create_match_participant_silver_stream(spark, cfg, max_files_per_trigger=MAX_FILES_PER_TRIGGER)
-        logger.info(f"Match participant stream started with ID: {query_participant.id}")
-        logger.info(f"Waiting {STARTUP_DELAY_SECONDS} seconds before starting next stream...")
-        time.sleep(STARTUP_DELAY_SECONDS)
-        
-        logger.info("Starting participant unit silver stream...")
-        query_unit = create_participant_unit_silver_stream(spark, cfg, max_files_per_trigger=MAX_FILES_PER_TRIGGER)
-        logger.info(f"Participant unit stream started with ID: {query_unit.id}")
-        
-        logger.info("All silver streams started successfully")
-        logger.info("Active streams:")
-        logger.info(f"  - Match SCD2: {query_match.id}")
-        logger.info(f"  - Match Participant SCD2: {query_participant.id}")
-        logger.info(f"  - Participant Unit SCD2: {query_unit.id}")
-        
-        # Monitor active streams
-        logger.info("Monitoring streams...")
-        active_streams = spark.streams.active
-        logger.info(f"Total active streams: {len(active_streams)}")
-        
-        # Wait for all queries to finish (they run indefinitely until stopped)
-        # Using awaitAnyTermination() to wait for any stream to fail
-        spark.streams.awaitAnyTermination()
+        if RUN_CONCURRENTLY:
+            logger.info("Running all streams concurrently (high memory usage)...")
+            # Start all streams together
+            query_match = create_match_silver_stream(spark, cfg, max_bytes_per_trigger=MAX_BYTES_PER_TRIGGER)
+            time.sleep(STARTUP_DELAY_SECONDS)
+            query_participant = create_match_participant_silver_stream(spark, cfg, max_bytes_per_trigger=MAX_BYTES_PER_TRIGGER)
+            time.sleep(STARTUP_DELAY_SECONDS)
+            query_unit = create_participant_unit_silver_stream(spark, cfg, max_bytes_per_trigger=MAX_BYTES_PER_TRIGGER)
+            
+            logger.info("All streams started. Waiting for termination...")
+            spark.streams.awaitAnyTermination()
+        else:
+            logger.info("Running streams ONE AT A TIME (memory efficient)...")
+            
+            #Process match stream until caught up
+            logger.info("=== Processing Match stream ===")
+            query_match = create_match_silver_stream(spark, cfg, max_bytes_per_trigger=MAX_BYTES_PER_TRIGGER)
+            logger.info(f"Match stream ID: {query_match.id}. Let it run for a while...")
+            spark.streams.awaitAnyTermination(timeout=300000)  # Run for 5 minutes or until complete
+            logger.info("Match stream processing completed")
+            
+            # Process match participant stream
+            logger.info("=== Processing Match Participant stream ===")
+            query_participant = create_match_participant_silver_stream(spark, cfg, max_bytes_per_trigger=MAX_BYTES_PER_TRIGGER)
+            logger.info(f"Match participant stream ID: {query_participant.id}")
+            spark.streams.awaitAnyTermination(timeout=300000)
+            logger.info("Match participant stream processing completed")
+            
+            # Process participant unit stream
+            logger.info("=== Processing Participant Unit stream ===")
+            query_unit = create_participant_unit_silver_stream(spark, cfg, max_bytes_per_trigger=MAX_BYTES_PER_TRIGGER)
+            logger.info(f"Participant unit stream ID: {query_unit.id}")
+            spark.streams.awaitAnyTermination()
+            logger.info("Participant unit stream processing completed")
         
     except Exception as e:
         logger.error(f"Error in unified silver job: {e}", exc_info=True)

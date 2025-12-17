@@ -68,15 +68,12 @@ def create_hash_key(df):
     )
 
 def process_scd2_batch(spark, bronze_df, silver_data_path):
-    """Process SCD Type 2 logic for a batch of data - Performance Optimized"""
+    """Process SCD Type 2 logic for a batch of data - Memory Optimized"""
     
-    if bronze_df.count() == 0:
+    if bronze_df.isEmpty():
         return
     
-    # Cache the input dataframe to avoid recomputation
-    bronze_df.cache()
-    
-    # Generate a single timestamp for the entire batch to ensure consistency
+    # Don't cache bronze_df
     batch_timestamp = F.current_timestamp()
     
     # Prepare the incoming data with optimized transformations
@@ -129,13 +126,13 @@ def process_scd2_batch(spark, bronze_df, silver_data_path):
                 "effective_date", "is_current"
             )
         )
-        current_records.cache()
+        # Don't cache current_records - let Spark manage memory
         
-        # Optimized join using broadcast hint for small current_records
+        # Use sort-merge join instead of broadcast to avoid OOM
         incoming_with_current = (
             processed_df.alias("new")
             .join(
-                F.broadcast(current_records.alias("current")),
+                current_records.alias("current"),
                 (F.col("new.match_id") == F.col("current.match_id")) &
                 (F.col("new.gameId") == F.col("current.gameId")),
                 "left"
@@ -231,13 +228,13 @@ def process_scd2_batch(spark, bronze_df, silver_data_path):
         bronze_df.unpersist()
         processed_df.unpersist()
 
-def create_match_silver_stream(spark: SparkSession, cfg=None, max_files_per_trigger=100):
+def create_match_silver_stream(spark: SparkSession, cfg=None, max_bytes_per_trigger="10m"):
     """Create and return streaming query for TFT match silver layer with SCD2.
     
     Args:
         spark: SparkSession to use
         cfg: Delta configuration
-        max_files_per_trigger: Maximum number of files to process per trigger (for large bronze tables)
+        max_bytes_per_trigger: Maximum data size to process per trigger (e.g., "50m", "100m")
     """
     if cfg is None:
         cfg = get_delta_config()
@@ -257,8 +254,12 @@ def create_match_silver_stream(spark: SparkSession, cfg=None, max_files_per_trig
     
     ensure_database(spark, silver_paths.db_name)
     
-    # Read from bronze layer as stream
-    bronze_stream = read_stream_from_delta(spark, bronze_paths.data_path)
+    # Read from bronze layer as stream with micro batch size limit
+    bronze_stream = read_stream_from_delta(
+        spark, 
+        bronze_paths.data_path,
+        max_bytes_per_trigger=max_bytes_per_trigger
+    )
     
     # Select only required columns with optimized column renaming
     selected_df = (
@@ -295,7 +296,6 @@ def create_match_silver_stream(spark: SparkSession, cfg=None, max_files_per_trig
         .foreachBatch(process_batch)
         .outputMode("update")
         .option("checkpointLocation", silver_paths.checkpoint_path)
-        .option("maxFilesPerTrigger", str(max_files_per_trigger))
         .trigger(processingTime="60 seconds")
         .queryName("silver-match-scd2")
         .start()
