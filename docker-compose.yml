@@ -117,6 +117,7 @@ services:
       - ./spark/jobs:/opt/spark-apps
       - .env:/opt/.env
       - ./src:/opt/src
+      - ./test_data:/opt/bitnami/spark/test_data
     networks:
       - nlhtung-net
 
@@ -139,6 +140,7 @@ services:
       - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
       - .env:/opt/.env
       - ./src:/opt/src
+      - ./test_data:/opt/bitnami/spark/test_data
     networks:
       - nlhtung-net
   
@@ -161,6 +163,7 @@ services:
       - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
       - .env:/opt/.env
       - ./src:/opt/src
+      - ./test_data:/opt/bitnami/spark/test_data
     networks:
       - nlhtung-net
 
@@ -183,6 +186,7 @@ services:
       - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
       - .env:/opt/.env
       - ./src:/opt/src
+      - ./test_data:/opt/bitnami/spark/test_data
     networks:
       - nlhtung-net
 
@@ -250,35 +254,35 @@ services:
     networks:
       - nlhtung-net
 
-  airflow-init:
-    build:
-      context: .
-      dockerfile: airflow/Dockerfile
-    container_name: airflow-init
-    depends_on:
-      postgres:
-        condition: service_healthy
-      airflow-redis:
-        condition: service_healthy
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
-      - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
-      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres:5432/airflow
-      - AIRFLOW__CORE__FERNET_KEY=z_lL_eTlP5BTuFAYKS8t4sqVfh97hySVN3PW4NCcwy4=
-      - AIRFLOW__CORE__LOAD_EXAMPLES=False
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./spark/jobs:/opt/spark-apps
-      - ./spark/config:/opt/spark-config
-    entrypoint: /bin/bash
-    command: >
-      -c "
-      airflow db init && 
-      airflow users create --username admin --password admin --firstname admin --lastname user --role Admin --email admin@example.com &&
-      airflow connections add 'spark_master' --conn-type 'spark' --conn-host 'spark://spark-master' --conn-port '7077'"
-    networks:
-      - nlhtung-net
+  # airflow-init:
+  #   build:
+  #     context: .
+  #     dockerfile: airflow/Dockerfile
+  #   container_name: airflow-init
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     airflow-redis:
+  #       condition: service_healthy
+  #   environment:
+  #     - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+  #     - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+  #     - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
+  #     - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres:5432/airflow
+  #     - AIRFLOW__CORE__FERNET_KEY=z_lL_eTlP5BTuFAYKS8t4sqVfh97hySVN3PW4NCcwy4=
+  #     - AIRFLOW__CORE__LOAD_EXAMPLES=False
+  #   volumes:
+  #     - ./airflow/dags:/opt/airflow/dags
+  #     - ./spark/jobs:/opt/spark-apps
+  #     - ./spark/config:/opt/spark-config
+  #   entrypoint: /bin/bash
+  #   command: >
+  #     -c "
+  #     airflow db init && 
+  #     airflow users create --username admin --password admin --firstname admin --lastname user --role Admin --email admin@example.com &&
+  #     airflow connections add 'spark_master' --conn-type 'spark' --conn-host 'spark://spark-master' --conn-port '7077'"
+  #   networks:
+  #     - nlhtung-net
 
   airflow-webserver:
     build:
