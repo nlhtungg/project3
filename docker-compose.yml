@@ -3,6 +3,11 @@ services:
   kafka-1:
     image: confluentinc/cp-kafka:7.7.0
     container_name: kafka-1
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
     ports:
       - "9092:9094"
       - "9093:9093"
@@ -30,6 +35,11 @@ services:
   kafka-2:
     image: confluentinc/cp-kafka:7.7.0
     container_name: kafka-2
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
     ports:
       - "9192:9094"
       - "9193:9093"
@@ -57,6 +67,11 @@ services:
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
     depends_on:
       - kafka-1
       - kafka-2
@@ -71,6 +86,11 @@ services:
   minio:
     image: minio/minio:latest
     container_name: minio
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
     command: server /data --console-address ":9001"
     environment:
       MINIO_ACCESS_KEY: minioadmin
@@ -102,6 +122,11 @@ services:
       context: .
       dockerfile: spark/Dockerfile
     container_name: spark-master
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
     environment:
       - SPARK_MODE=master
       - SPARK_MASTER_HOST=spark-master
@@ -126,6 +151,11 @@ services:
       context: .
       dockerfile: spark/Dockerfile
     container_name: spark-worker-1
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
@@ -149,6 +179,11 @@ services:
       context: .
       dockerfile: spark/Dockerfile
     container_name: spark-worker-2
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
@@ -172,6 +207,11 @@ services:
       context: .
       dockerfile: spark/Dockerfile
     container_name: spark-worker-3
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
@@ -193,6 +233,11 @@ services:
   postgres:
     image: postgres:15
     container_name: postgres
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -212,6 +257,11 @@ services:
   hive-metastore:
     image: apache/hive:4.0.0
     container_name: hive-metastore
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
     depends_on:
       postgres:
         condition: service_healthy
@@ -244,6 +294,11 @@ services:
   airflow-redis:
     image: redis:7
     container_name: redis
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
     ports:
       - "6379:6379"
     healthcheck:
@@ -289,9 +344,14 @@ services:
       context: .
       dockerfile: airflow/Dockerfile
     container_name: airflow-webserver
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
     depends_on:
-      airflow-init:
-        condition: service_completed_successfully
+      # airflow-init:
+      #   condition: service_completed_successfully
       postgres:
         condition: service_healthy
       airflow-redis:
@@ -325,9 +385,14 @@ services:
       context: .
       dockerfile: airflow/Dockerfile
     container_name: airflow-scheduler
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
     depends_on:
-      airflow-init:
-        condition: service_completed_successfully
+      # airflow-init:
+      #   condition: service_completed_successfully
       postgres:
         condition: service_healthy
       airflow-redis:
@@ -359,9 +424,14 @@ services:
       context: .
       dockerfile: airflow/Dockerfile
     container_name: airflow-worker
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
     depends_on:
-      airflow-init:
-        condition: service_completed_successfully
+      # airflow-init:
+      #   condition: service_completed_successfully
       postgres:
         condition: service_healthy
       airflow-redis:
@@ -391,6 +461,11 @@ services:
   trino-coordinator:
     image: trinodb/trino:414
     container_name: trino-coordinator
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
     ports:
       - "8088:8080"
     volumes:
@@ -403,6 +478,11 @@ services:
   trino-worker:
     image: trinodb/trino:414
     container_name: trino-worker
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
     depends_on:
       - trino-coordinator
     volumes:
@@ -412,44 +492,49 @@ services:
     networks:
       - nlhtung-net
 
-  # superset:
-  #   build:
-  #     context: .
-  #     dockerfile: superset/Dockerfile
-  #   container_name: superset
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     trino-coordinator:
-  #       condition: service_started
-  #   environment:
-  #     - SUPERSET_SECRET_KEY=supersetsecretkey
-  #     - SUPERSET_ENV=production
-  #     - DATABASE_DB=superset
-  #     - DATABASE_HOST=postgres
-  #     - DATABASE_PASSWORD=superset
-  #     - DATABASE_USER=superset
-  #     - DATABASE_PORT=5432
-  #     - DATABASE_DIALECT=postgresql
-  #     - SUPERSET_LOAD_EXAMPLES=no
-  #   ports:
-  #     - "8089:8088"
-  #   volumes:
-  #     - superset_data:/app/superset_home
-  #     - ./superset/superset_config.py:/app/superset_config/superset_config.py
-  #   command: >
-  #     bash -c "
-  #     superset db upgrade &&
-  #     superset fab create-admin --username admin --firstname Admin --lastname User --email admin@superset.com --password admin &&
-  #     superset init &&
-  #     superset run -h 0.0.0.0 -p 8088 --with-threads --reload --debugger"
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "curl -f http://localhost:8088/health || exit 1"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 5
-  #   networks:
-  #     - nlhtung-net
+  superset:
+    build:
+      context: .
+      dockerfile: superset/Dockerfile
+    container_name: superset
+    depends_on:
+      postgres:
+        condition: service_healthy
+      trino-coordinator:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    environment:
+      - SUPERSET_SECRET_KEY=supersetsecretkey
+      - SUPERSET_ENV=production
+      - DATABASE_DB=superset
+      - DATABASE_HOST=postgres
+      - DATABASE_PASSWORD=superset
+      - DATABASE_USER=superset
+      - DATABASE_PORT=5432
+      - DATABASE_DIALECT=postgresql
+      - SUPERSET_LOAD_EXAMPLES=no
+    ports:
+      - "8089:8088"
+    volumes:
+      - superset_data:/app/superset_home
+      - ./superset/superset_config.py:/app/superset_config/superset_config.py
+    command: >
+      bash -c "
+      superset db upgrade &&
+      superset fab create-admin --username admin --firstname Admin --lastname User --email admin@superset.com --password admin &&
+      superset init &&
+      superset run -h 0.0.0.0 -p 8088 --with-threads --reload --debugger"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8088/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - nlhtung-net
 
   # prometheus:
   #   image: prom/prometheus:v2.49.1
