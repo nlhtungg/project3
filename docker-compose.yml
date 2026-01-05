@@ -64,24 +64,24 @@ services:
     networks:
       - nlhtung-net
 
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: kafka-ui
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 512M
-    depends_on:
-      - kafka-1
-      - kafka-2
-    ports:
-      - "8085:8080"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:9092,kafka-2:9092
-    networks:
-      - nlhtung-net
+  # kafka-ui:
+  #   image: provectuslabs/kafka-ui:latest
+  #   container_name: kafka-ui
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '1.0'
+  #         memory: 512M
+  #   depends_on:
+  #     - kafka-1
+  #     - kafka-2
+  #   ports:
+  #     - "8085:8080"
+  #   environment:
+  #     KAFKA_CLUSTERS_0_NAME: local
+  #     KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:9092,kafka-2:9092
+  #   networks:
+  #     - nlhtung-net
 
   minio:
     image: minio/minio:latest
@@ -154,13 +154,13 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.0'
-          memory: 2G
+          cpus: '8.0'
+          memory: 8G
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
-      - SPARK_WORKER_CORES=2
-      - SPARK_WORKER_MEMORY=2g
+      - SPARK_WORKER_CORES=8
+      - SPARK_WORKER_MEMORY=8g
     ports:
       - "8081:8081"
     depends_on:
@@ -174,61 +174,61 @@ services:
     networks:
       - nlhtung-net
   
-  spark-worker-2:
-    build:
-      context: .
-      dockerfile: spark/Dockerfile
-    container_name: spark-worker-2
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 2G
-    environment:
-      - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark-master:7077
-      - SPARK_WORKER_CORES=2
-      - SPARK_WORKER_MEMORY=2g
-    ports:
-      - "8082:8081"
-    depends_on:
-      - spark-master
-    volumes:
-      - ./spark/jobs:/opt/spark-apps
-      - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
-      - .env:/opt/.env
-      - ./src:/opt/src
-      - ./test_data:/opt/bitnami/spark/test_data
-    networks:
-      - nlhtung-net
+  # spark-worker-2:
+  #   build:
+  #     context: .
+  #     dockerfile: spark/Dockerfile
+  #   container_name: spark-worker-2
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '2.0'
+  #         memory: 2G
+  #   environment:
+  #     - SPARK_MODE=worker
+  #     - SPARK_MASTER_URL=spark://spark-master:7077
+  #     - SPARK_WORKER_CORES=2
+  #     - SPARK_WORKER_MEMORY=2g
+  #   ports:
+  #     - "8082:8081"
+  #   depends_on:
+  #     - spark-master
+  #   volumes:
+  #     - ./spark/jobs:/opt/spark-apps
+  #     - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
+  #     - .env:/opt/.env
+  #     - ./src:/opt/src
+  #     - ./test_data:/opt/bitnami/spark/test_data
+  #   networks:
+  #     - nlhtung-net
 
-  spark-worker-3:
-    build:
-      context: .
-      dockerfile: spark/Dockerfile
-    container_name: spark-worker-3
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 2G
-    environment:
-      - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark-master:7077
-      - SPARK_WORKER_CORES=2
-      - SPARK_WORKER_MEMORY=2g
-    ports:
-      - "8083:8081"
-    depends_on:
-      - spark-master
-    volumes:
-      - ./spark/jobs:/opt/spark-apps
-      - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
-      - .env:/opt/.env
-      - ./src:/opt/src
-      - ./test_data:/opt/bitnami/spark/test_data
-    networks:
-      - nlhtung-net
+  # spark-worker-3:
+  #   build:
+  #     context: .
+  #     dockerfile: spark/Dockerfile
+  #   container_name: spark-worker-3
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '2.0'
+  #         memory: 2G
+  #   environment:
+  #     - SPARK_MODE=worker
+  #     - SPARK_MASTER_URL=spark://spark-master:7077
+  #     - SPARK_WORKER_CORES=2
+  #     - SPARK_WORKER_MEMORY=2g
+  #   ports:
+  #     - "8083:8081"
+  #   depends_on:
+  #     - spark-master
+  #   volumes:
+  #     - ./spark/jobs:/opt/spark-apps
+  #     - ./hive-metastore/hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
+  #     - .env:/opt/.env
+  #     - ./src:/opt/src
+  #     - ./test_data:/opt/bitnami/spark/test_data
+  #   networks:
+  #     - nlhtung-net
 
   postgres:
     image: postgres:15
@@ -339,46 +339,46 @@ services:
   #   networks:
   #     - nlhtung-net
 
-  airflow-webserver:
-    build:
-      context: .
-      dockerfile: airflow/Dockerfile
-    container_name: airflow-webserver
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 512M
-    depends_on:
-      # airflow-init:
-      #   condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
-      airflow-redis:
-        condition: service_healthy
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
-      - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
-      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres:5432/airflow
-      - AIRFLOW__CORE__FERNET_KEY=z_lL_eTlP5BTuFAYKS8t4sqVfh97hySVN3PW4NCcwy4=
-      - AIRFLOW__CORE__LOAD_EXAMPLES=False
-      - AIRFLOW__WEBSERVER__SECRET_KEY=your-consistent-secret-key
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./spark/jobs:/opt/spark-apps
-      - ./spark/config:/opt/spark-config
-      - .env:/opt/.env
-    ports:
-      - "8686:8080"
-    command: webserver
-    healthcheck:
-      test: ["CMD-SHELL", "[ -f /opt/airflow/airflow-webserver.pid ]"]
-      interval: 30s
-      timeout: 30s
-      retries: 3
-    networks:
-      - nlhtung-net
+  # airflow-webserver:
+  #   build:
+  #     context: .
+  #     dockerfile: airflow/Dockerfile
+  #   container_name: airflow-webserver
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '1.0'
+  #         memory: 512M
+  #   depends_on:
+  #     # airflow-init:
+  #     #   condition: service_completed_successfully
+  #     postgres:
+  #       condition: service_healthy
+  #     airflow-redis:
+  #       condition: service_healthy
+  #   environment:
+  #     - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+  #     - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+  #     - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
+  #     - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres:5432/airflow
+  #     - AIRFLOW__CORE__FERNET_KEY=z_lL_eTlP5BTuFAYKS8t4sqVfh97hySVN3PW4NCcwy4=
+  #     - AIRFLOW__CORE__LOAD_EXAMPLES=False
+  #     - AIRFLOW__WEBSERVER__SECRET_KEY=your-consistent-secret-key
+  #   volumes:
+  #     - ./airflow/dags:/opt/airflow/dags
+  #     - ./spark/jobs:/opt/spark-apps
+  #     - ./spark/config:/opt/spark-config
+  #     - .env:/opt/.env
+  #   ports:
+  #     - "8686:8080"
+  #   command: webserver
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "[ -f /opt/airflow/airflow-webserver.pid ]"]
+  #     interval: 30s
+  #     timeout: 30s
+  #     retries: 3
+  #   networks:
+  #     - nlhtung-net
 
   airflow-scheduler:
     build:
@@ -458,9 +458,9 @@ services:
     networks:
       - nlhtung-net
 
-  trino-coordinator:
+  trino:
     image: trinodb/trino:414
-    container_name: trino-coordinator
+    container_name: trino
     deploy:
       resources:
         limits:
@@ -470,25 +470,6 @@ services:
       - "8088:8080"
     volumes:
       - ./trino:/etc/trino/catalog
-    command: >
-      bash -c "/usr/lib/trino/bin/run-trino --server --coordinator"
-    networks:
-      - nlhtung-net
-
-  trino-worker:
-    image: trinodb/trino:414
-    container_name: trino-worker
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-    depends_on:
-      - trino-coordinator
-    volumes:
-      - ./trino:/etc/trino/catalog
-    command: >
-      bash -c "/usr/lib/trino/bin/run-trino --server --worker"
     networks:
       - nlhtung-net
 
@@ -500,7 +481,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      trino-coordinator:
+      trino:
         condition: service_started
     deploy:
       resources:

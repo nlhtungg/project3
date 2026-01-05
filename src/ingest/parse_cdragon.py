@@ -129,12 +129,20 @@ def parse_traits(data):
                 'icon': trait.get('icon', ''),
             }
             
-            # Get effect tiers
+            # Initialize all 12 tiers with empty values
+            for tier_num in range(1, 13):
+                trait_entry[f'tier{tier_num}_min'] = ''
+                trait_entry[f'tier{tier_num}_max'] = ''
+                trait_entry[f'tier{tier_num}_style'] = ''
+            
+            # Get effect tiers and fill in actual values
             effects = trait.get('effects', [])
             for i, effect in enumerate(effects):
-                trait_entry[f'tier{i+1}_min'] = effect.get('minUnits', '')
-                trait_entry[f'tier{i+1}_max'] = effect.get('maxUnits', '')
-                trait_entry[f'tier{i+1}_style'] = effect.get('style', '')
+                tier_num = i + 1
+                if tier_num <= 12:  # Only process up to tier 12
+                    trait_entry[f'tier{tier_num}_min'] = effect.get('minUnits', '')
+                    trait_entry[f'tier{tier_num}_max'] = effect.get('maxUnits', '')
+                    trait_entry[f'tier{tier_num}_style'] = effect.get('style', '')
             
             traits_list.append(trait_entry)
     
@@ -176,6 +184,10 @@ def parse_items(data):
         if match:
             set_num = int(match.group(1))
         
+        # Parse effects/stats - keep as JSON string
+        effects = item.get('effects', {})
+        effects_json = json.dumps(effects) if effects else ''
+        
         item_entry = {
             'set': set_num if set_num else '',
             'item_id': api_name,
@@ -186,6 +198,7 @@ def parse_items(data):
             'component2': composition[1] if len(composition) > 1 else '',
             'num_components': len(composition),
             'unique': item.get('unique', False),
+            'effects': effects_json,
         }
         
         items_list.append(item_entry)
