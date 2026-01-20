@@ -339,46 +339,48 @@ services:
   #   networks:
   #     - nlhtung-net
 
-  # airflow-webserver:
-  #   build:
-  #     context: .
-  #     dockerfile: airflow/Dockerfile
-  #   container_name: airflow-webserver
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '1.0'
-  #         memory: 512M
-  #   depends_on:
-  #     # airflow-init:
-  #     #   condition: service_completed_successfully
-  #     postgres:
-  #       condition: service_healthy
-  #     airflow-redis:
-  #       condition: service_healthy
-  #   environment:
-  #     - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-  #     - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
-  #     - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
-  #     - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres:5432/airflow
-  #     - AIRFLOW__CORE__FERNET_KEY=z_lL_eTlP5BTuFAYKS8t4sqVfh97hySVN3PW4NCcwy4=
-  #     - AIRFLOW__CORE__LOAD_EXAMPLES=False
-  #     - AIRFLOW__WEBSERVER__SECRET_KEY=your-consistent-secret-key
-  #   volumes:
-  #     - ./airflow/dags:/opt/airflow/dags
-  #     - ./spark/jobs:/opt/spark-apps
-  #     - ./spark/config:/opt/spark-config
-  #     - .env:/opt/.env
-  #   ports:
-  #     - "8686:8080"
-  #   command: webserver
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "[ -f /opt/airflow/airflow-webserver.pid ]"]
-  #     interval: 30s
-  #     timeout: 30s
-  #     retries: 3
-  #   networks:
-  #     - nlhtung-net
+  airflow-webserver:
+    build:
+      context: .
+      dockerfile: airflow/Dockerfile
+    container_name: airflow-webserver
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+    depends_on:
+      # airflow-init:
+      #   condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      airflow-redis:
+        condition: service_healthy
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres:5432/airflow
+      - AIRFLOW__CORE__FERNET_KEY=z_lL_eTlP5BTuFAYKS8t4sqVfh97hySVN3PW4NCcwy4=
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__WEBSERVER__SECRET_KEY=your-consistent-secret-key
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./spark/jobs:/opt/spark-apps
+      - ./spark/config:/opt/spark-config
+      - ./src:/opt/src
+      - ./test_data:/opt/test_data
+      - .env:/opt/.env
+    ports:
+      - "8686:8080"
+    command: webserver
+    healthcheck:
+      test: ["CMD-SHELL", "[ -f /opt/airflow/airflow-webserver.pid ]"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    networks:
+      - nlhtung-net
 
   airflow-scheduler:
     build:
@@ -409,6 +411,8 @@ services:
       - ./airflow/dags:/opt/airflow/dags
       - ./spark/jobs:/opt/spark-apps
       - ./spark/config:/opt/spark-config
+      - ./src:/opt/src
+      - ./test_data:/opt/test_data
       - .env:/opt/.env
     command: scheduler
     healthcheck:
@@ -427,8 +431,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'
-          memory: 1G
+          cpus: '2.0'
+          memory: 2G
     depends_on:
       # airflow-init:
       #   condition: service_completed_successfully
@@ -448,6 +452,8 @@ services:
       - ./airflow/dags:/opt/airflow/dags
       - ./spark/jobs:/opt/spark-apps
       - ./spark/config:/opt/spark-config
+      - ./src:/opt/src
+      - ./test_data:/opt/test_data
       - .env:/opt/.env
     command: celery worker
     healthcheck:
@@ -464,12 +470,13 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'
-          memory: 1G
+          cpus: '8.0'
+          memory: 8G
     ports:
       - "8088:8080"
     volumes:
-      - ./trino:/etc/trino/catalog
+      - ./trino/catalog:/etc/trino/catalog
+      - ./trino/config.properties:/etc/trino/config.properties
     networks:
       - nlhtung-net
 

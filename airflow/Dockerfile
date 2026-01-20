@@ -15,7 +15,7 @@ RUN curl -L -o /tmp/spark.tgz https://archive.apache.org/dist/spark/spark-3.5.1/
     rm /tmp/spark.tgz
 
 ENV SPARK_HOME=/opt/spark
-ENV PATH=$SPARK_HOME/bin:$PATH
+ENV PATH="${SPARK_HOME}/bin:/home/airflow/.local/bin:${PATH}"
 
 # Copy compatible Hadoop 3.3.4 libraries and other JARs
 # This ensures S3A support matches Spark 3.5.1's bundled Hadoop version
@@ -24,9 +24,11 @@ COPY ./jars/*.jar /opt/spark/jars/
 # --- Switch back to airflow user ---
 USER airflow
 
+ARG CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-2.10.0/constraints-3.11.txt"
+
 # pyspark version phải trùng Spark binary
 RUN pip install pyspark==3.5.1 \
     && pip install delta-spark==3.2.0 \
     && pip install pyarrow datetime requests beautifulsoup4 pendulum minio \
-    && pip install apache-airflow-providers-apache-spark \
+    && pip install apache-airflow-providers-apache-spark --constraint "${CONSTRAINT_URL}" \
     && pip install python-dotenv

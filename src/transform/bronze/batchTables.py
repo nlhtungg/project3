@@ -22,14 +22,14 @@ from transform.bronze.augment import load_augments_to_bronze
 logger = get_logger("bronze-batch-tables")
 
 
-def batch_load_all_tables(spark, cfg, source_dir="test_data"):
+def batch_load_all_tables(spark, cfg, source_dir="s3a://bronze/csv"):
     """
     Batch load all TFT tables to Bronze Delta layer
     
     Args:
         spark: SparkSession
         cfg: DeltaLakeConfig
-        source_dir: Directory containing CSV files
+        source_dir: Directory containing CSV files (supports s3a:// or local path)
     """
     logger.info("="*70)
     logger.info("BRONZE LAYER - BATCH LOAD ALL TABLES")

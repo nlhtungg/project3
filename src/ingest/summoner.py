@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # Load environment variables from a .env file
 load_dotenv()
 
-api_key = os.getenv("RIOT_API_KEY")  # Load API key from environment variable
+api_key = os.getenv("RIOT_SUMMONER_API_KEY")  # Load API key from environment variable
 kafka_bootstrap_servers = ['localhost:9092', 'localhost:9192']
 kafka_topic = "tft_summoner"
 

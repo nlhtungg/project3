@@ -52,31 +52,40 @@ def main():
             time.sleep(STARTUP_DELAY_SECONDS)
             query_unit = create_participant_unit_silver_stream(spark, cfg, max_bytes_per_trigger=MAX_BYTES_PER_TRIGGER)
             
-            logger.info("All streams started. Waiting for termination...")
-            spark.streams.awaitAnyTermination()
+            logger.info("All streams started successfully")
+            logger.info("Stream IDs:")
+            logger.info(f"  - Match: {query_match.id}")
+            logger.info(f"  - Match Participant: {query_participant.id}")
+            logger.info(f"  - Participant Unit: {query_unit.id}")
+            
+            # Wait for all queries to finish (they run indefinitely until stopped)
+            logger.info("Waiting for streams to terminate (Ctrl+C to stop)...")
+            query_match.awaitTermination()
+            query_participant.awaitTermination()
+            query_unit.awaitTermination()
         else:
             logger.info("Running streams ONE AT A TIME (memory efficient)...")
             
-            #Process match stream until caught up
+            # Process match stream continuously
             logger.info("=== Processing Match stream ===")
             query_match = create_match_silver_stream(spark, cfg, max_bytes_per_trigger=MAX_BYTES_PER_TRIGGER)
-            logger.info(f"Match stream ID: {query_match.id}. Let it run for a while...")
-            spark.streams.awaitAnyTermination(timeout=300000)  # Run for 5 minutes or until complete
-            logger.info("Match stream processing completed")
+            logger.info(f"Match stream ID: {query_match.id}. Running continuously...")
+            query_match.awaitTermination()
+            logger.info("Match stream terminated")
             
-            # Process match participant stream
+            # Process match participant stream continuously
             logger.info("=== Processing Match Participant stream ===")
             query_participant = create_match_participant_silver_stream(spark, cfg, max_bytes_per_trigger=MAX_BYTES_PER_TRIGGER)
-            logger.info(f"Match participant stream ID: {query_participant.id}")
-            spark.streams.awaitAnyTermination(timeout=300000)
-            logger.info("Match participant stream processing completed")
+            logger.info(f"Match participant stream ID: {query_participant.id}. Running continuously...")
+            query_participant.awaitTermination()
+            logger.info("Match participant stream terminated")
             
-            # Process participant unit stream
+            # Process participant unit stream continuously
             logger.info("=== Processing Participant Unit stream ===")
             query_unit = create_participant_unit_silver_stream(spark, cfg, max_bytes_per_trigger=MAX_BYTES_PER_TRIGGER)
-            logger.info(f"Participant unit stream ID: {query_unit.id}")
-            spark.streams.awaitAnyTermination()
-            logger.info("Participant unit stream processing completed")
+            logger.info(f"Participant unit stream ID: {query_unit.id}. Running continuously...")
+            query_unit.awaitTermination()
+            logger.info("Participant unit stream terminated")
         
     except Exception as e:
         logger.error(f"Error in unified silver job: {e}", exc_info=True)

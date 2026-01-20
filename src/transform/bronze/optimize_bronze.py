@@ -29,8 +29,8 @@ logger = get_logger("bronze-optimize")
 # IMPORTANT for streaming: do NOT use very small retention
 # windows or aggressive VACUUM while structured streaming jobs
 # are still reading older versions of the table.
-VACUUM_RETENTION_HOURS = 168  # 7 days retention for VACUUM (Delta default)
-RUN_VACUUM = False  # Disable VACUUM by default to avoid deleting files needed by streams
+VACUUM_RETENTION_HOURS = 0  # 7 days retention for VACUUM (Delta default)
+RUN_VACUUM = True  # Enable VACUUM to clean up old files
 
 # Bronze tables to optimize
 BRONZE_TABLES = [

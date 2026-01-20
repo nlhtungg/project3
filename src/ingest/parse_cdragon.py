@@ -2,11 +2,14 @@
 Parse Community Dragon TFT data and export to CSV files
 Input: test_data/cdragon_en_us.json
 Output: units.csv, items.csv, traits.csv, augments.csv
+Then upload to MinIO s3a://bronze/csv/
 """
 import json
 import pandas as pd
 import os
 import re
+import boto3
+from botocore.client import Config
 
 
 def clean_html_tags(text):
@@ -22,7 +25,7 @@ def clean_html_tags(text):
 
 def load_cdragon_data():
     """Load the Community Dragon JSON file"""
-    file_path = 'test_data/cdragon_en_us.json'
+    file_path = '/opt/test_data/cdragon_en_us.json'
     
     print("Loading Community Dragon data...")
     with open(file_path, 'r', encoding='utf-8') as f:
@@ -261,39 +264,88 @@ def parse_augments(data):
     return augments_list
 
 
+def upload_to_minio(file_paths):
+    """Upload CSV files to MinIO bucket bronze/csv"""
+    print("\n--- Uploading to MinIO ---")
+    
+    try:
+        # Configure S3 client for MinIO
+        s3_client = boto3.client(
+            's3',
+            endpoint_url='http://minio:9000',
+            aws_access_key_id='minioadmin',
+            aws_secret_access_key='minioadmin',
+            config=Config(signature_version='s3v4'),
+            region_name='us-east-1'
+        )
+        
+        # Upload each file
+        bucket_name = 'bronze'
+        for file_path in file_paths:
+            file_name = os.path.basename(file_path)
+            s3_key = f'csv/{file_name}'
+            
+            if os.path.exists(file_path):
+                s3_client.upload_file(file_path, bucket_name, s3_key)
+                print(f"✓ Uploaded {file_name} to s3a://{bucket_name}/{s3_key}")
+            else:
+                print(f"✗ File not found: {file_path}")
+        
+        print(f"\n✓ All files uploaded to MinIO successfully!")
+        print(f"   Access path: s3a://bronze/csv/")
+        
+    except Exception as e:
+        print(f"\n✗ Error uploading to MinIO: {str(e)}")
+        print(f"   Note: Files are still saved locally in /opt/test_data/")
+        raise
+
+
 def save_to_csv(units, traits, items, augments):
     """Save all data to CSV files"""
     print("\n--- Saving to CSV ---")
     
-    os.makedirs('test_data', exist_ok=True)
+    os.makedirs('/opt/test_data', exist_ok=True)
+    
+    csv_files = []
     
     # Save units
     if units:
         df_units = pd.DataFrame(units)
         df_units = df_units.sort_values(['set', 'cost', 'unit_name'])
-        df_units.to_csv('test_data/units.csv', index=False, encoding='utf-8')
-        print(f"✓ Saved {len(units)} units to test_data/units.csv")
+        units_path = '/opt/test_data/units.csv'
+        df_units.to_csv(units_path, index=False, encoding='utf-8')
+        csv_files.append(units_path)
+        print(f"✓ Saved {len(units)} units to {units_path}")
     
     # Save traits
     if traits:
         df_traits = pd.DataFrame(traits)
         df_traits = df_traits.sort_values(['set', 'trait_name'])
-        df_traits.to_csv('test_data/traits.csv', index=False, encoding='utf-8')
-        print(f"✓ Saved {len(traits)} traits to test_data/traits.csv")
+        traits_path = '/opt/test_data/traits.csv'
+        df_traits.to_csv(traits_path, index=False, encoding='utf-8')
+        csv_files.append(traits_path)
+        print(f"✓ Saved {len(traits)} traits to {traits_path}")
     
     # Save items
     if items:
         df_items = pd.DataFrame(items)
         df_items = df_items.sort_values(['set', 'item_name'])
-        df_items.to_csv('test_data/items.csv', index=False, encoding='utf-8')
-        print(f"✓ Saved {len(items)} items to test_data/items.csv")
+        items_path = '/opt/test_data/items.csv'
+        df_items.to_csv(items_path, index=False, encoding='utf-8')
+        csv_files.append(items_path)
+        print(f"✓ Saved {len(items)} items to {items_path}")
     
     # Save augments
     if augments:
         df_augments = pd.DataFrame(augments)
         df_augments = df_augments.sort_values(['set', 'tier', 'augment_name'])
-        df_augments.to_csv('test_data/augments.csv', index=False, encoding='utf-8')
-        print(f"✓ Saved {len(augments)} augments to test_data/augments.csv")
+        augments_path = '/opt/test_data/augments.csv'
+        df_augments.to_csv(augments_path, index=False, encoding='utf-8')
+        csv_files.append(augments_path)
+        print(f"✓ Saved {len(augments)} augments to {augments_path}")
+    
+    # Upload to MinIO
+    upload_to_minio(csv_files)
     
     return df_units, df_traits, df_items, df_augments
 

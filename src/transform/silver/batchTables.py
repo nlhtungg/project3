@@ -18,6 +18,7 @@ from transform.silver.unit import process_units_scd2
 from transform.silver.item import process_items_scd2
 from transform.silver.trait import process_traits_scd2
 from transform.silver.augment import process_augments_scd2
+from transform.silver.summoner import process_scd2_batch as process_summoners_scd2
 
 logger = get_logger("silver-batch-tables")
 
@@ -65,6 +66,13 @@ def batch_process_all_tables(spark, cfg):
             "process_func": process_augments_scd2,
             "bronze_path": f"{bronze_bucket}/tft_augments",
             "silver_path": f"{silver_bucket}/tft_augments"
+        },
+        {
+            "name": "summoners",
+            "table_name": "tft_summoners",
+            "process_func": process_summoners_scd2,
+            "bronze_path": f"{bronze_bucket}/tft_summoners",
+            "silver_path": f"{silver_bucket}/tft_summoners"
         }
     ]
     

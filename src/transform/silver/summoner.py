@@ -244,7 +244,7 @@ def main():
     
     # Silver layer paths
     silver_layer = "silver"
-    silver_table_name = "tft_summoners_scd2"
+    silver_table_name = "tft_summoners"
     silver_paths = build_paths(silver_layer, silver_table_name, cfg)
     
     ensure_database(spark, silver_paths.db_name)

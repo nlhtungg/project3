@@ -33,8 +33,8 @@ def download_cdragon_data():
             print(f"✓ JSON parsed successfully")
             
             # Save to file
-            os.makedirs('test_data', exist_ok=True)
-            output_file = 'test_data/cdragon_en_us.json'
+            os.makedirs('/opt/test_data', exist_ok=True)
+            output_file = '/opt/test_data/cdragon_en_us.json'
             
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
@@ -85,7 +85,7 @@ def main():
         print("\n" + "="*70)
         print("SUCCESS!")
         print("="*70)
-        print("Data downloaded and saved to test_data/cdragon_en_us.json")
+        print("Data downloaded and saved to /opt/test_data/cdragon_en_us.json")
         print("\nNext steps:")
         print("1. Examine the JSON structure")
         print("2. Find the units/champions data")

@@ -51,8 +51,11 @@ def main():
         logger.info(f"  - Participant Unit: {query_unit.id}")
         
         # Wait for all queries to finish (they run indefinitely until stopped)
-        # Using awaitAnyTermination() to wait for any stream to fail
-        spark.streams.awaitAnyTermination()
+        # Each query will run continuously until explicitly stopped or on error
+        logger.info("Waiting for streams to terminate (Ctrl+C to stop)...")
+        query_match.awaitTermination()
+        query_participant.awaitTermination()
+        query_unit.awaitTermination()
         
     except Exception as e:
         logger.error(f"Error in unified bronze job: {e}", exc_info=True)
